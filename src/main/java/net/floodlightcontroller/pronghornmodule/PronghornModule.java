@@ -43,6 +43,8 @@ public class PronghornModule
     protected IStaticFlowEntryPusherService flow_entry_pusher;
     protected ConcurrentHashMap<IOFSwitch, BlockingQueue<OFMessage>> queues;
 
+    protected PronghornSwitchListener switch_listener = new PronghornSwitchListener();
+    
     @Override
     public Collection<Class<? extends IFloodlightService>> getModuleServices()
     {
@@ -83,10 +85,13 @@ public class PronghornModule
     }
 
     @Override
-    public void startUp(FloodlightModuleContext context) {
+    public void startUp(FloodlightModuleContext context)
+    {
         floodlightProvider.addOFMessageListener(OFType.BARRIER_REPLY, this);
         floodlightProvider.addOFMessageListener(OFType.ERROR, this);
         restApi.addRestletRoutable(new PronghornWebRoutable());
+
+        switch_listener.init(floodlightProvider,log);
     }
     
     @Override
@@ -95,17 +100,19 @@ public class PronghornModule
     }
 
     @Override
-    public boolean isCallbackOrderingPrereq(OFType type, String name) {
-        // TODO Auto-generated method stub
+    public boolean isCallbackOrderingPrereq(OFType type, String name)
+    {
+        /// FIXME: Not entirely sure what this method does
         return false;
     }
     
     @Override
-    public boolean isCallbackOrderingPostreq(OFType type, String name) {
-        // TODO Auto-generated method stub
+    public boolean isCallbackOrderingPostreq(OFType type, String name)
+    {
+        /// FIXME: Not entirely sure what this method does
         return false;
     }
-    
+
     /* Create queue for sw if does not exist */
     private void ensureQueueExists(IOFSwitch sw) {
         if (!queues.contains(sw)) {
@@ -148,7 +155,7 @@ public class PronghornModule
         return Command.CONTINUE;
     }
 
-    
+    /** IPronghornService interfaces*/        
     @Override
     public String sendBarrier(String switch_id)
     {
@@ -194,6 +201,31 @@ public class PronghornModule
         return send_flow_mod_msg(entry,false);
     }
 
+    @Override
+    public void register_switch_changes_listener(
+        ISwitchAddedRemovedListener switch_added_removed_listener)
+    {
+        switch_listener.register_switch_changes_listener(
+            switch_added_removed_listener);
+    }
+    @Override
+    public void unregister_switch_changes_listener(
+        ISwitchAddedRemovedListener switch_added_removed_listener)
+    {
+        switch_listener.unregister_switch_changes_listener(
+            switch_added_removed_listener);
+    }
+
+    @Override
+    public void barrier (
+        String switch_id,IPronghornBarrierCallback cb) throws IOException
+    {
+        if (send_barrier(switch_id,cb))
+            cb.barrier_success();
+        else
+            cb.barrier_failure();
+    }
+
     private int send_flow_mod_msg (
         PronghornFlowTableEntry entry, boolean add_msg)
         throws IOException, IllegalArgumentException
@@ -212,16 +244,6 @@ public class PronghornModule
     }
     
     
-    @Override
-    public void barrier (
-        String switch_id,IPronghornBarrierCallback cb) throws IOException
-    {
-        if (send_barrier(switch_id,cb))
-            cb.barrier_success();
-        else
-            cb.barrier_failure();
-    }
-
     /**
        @returns {boolean} --- True if the barrier completes before
        timing out.  False if it does not.  Note that a transaction may
@@ -287,4 +309,5 @@ public class PronghornModule
             // END DEBUG
         }
     }
+    
 }

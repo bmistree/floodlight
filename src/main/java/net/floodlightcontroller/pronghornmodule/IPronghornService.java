@@ -17,5 +17,9 @@ public interface IPronghornService extends IFloodlightService {
         throws IOException, IllegalArgumentException;
     public void barrier (
         String switch_id,IPronghornBarrierCallback cb) throws IOException;
-    
+
+    public void register_switch_changes_listener(
+        ISwitchAddedRemovedListener switch_added_removed_listener);
+    public void unregister_switch_changes_listener(
+        ISwitchAddedRemovedListener switch_added_removed_listener);
 }
