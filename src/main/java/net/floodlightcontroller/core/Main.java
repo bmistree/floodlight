@@ -24,6 +24,7 @@ import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.FloodlightModuleLoader;
 import net.floodlightcontroller.core.module.IFloodlightModuleContext;
 import net.floodlightcontroller.restserver.IRestApiService;
+import net.floodlightcontroller.pronghornmodule.IPronghornService;
 
 /**
  * Host for the Floodlight main method
@@ -53,12 +54,12 @@ public class Main {
         }
 
         IFloodlightProviderService controller =
-            get_controller(settings.getModuleFile());
+            get_controller(settings.getModuleFile()).floodlight_provider;
         // This call blocks, it has to be the last line in the main
         controller.run();
     }
 
-    public static IFloodlightProviderService get_controller(
+    public static ProviderPronghornTuple get_controller(
         String settings_filename) throws FloodlightModuleException
     {
         // Load modules
@@ -70,10 +71,28 @@ public class Main {
         IRestApiService restApi =
             moduleContext.getServiceImpl(IRestApiService.class);
         restApi.run();
+
+        // Grab the pronghorn module
+        IPronghornService pronghorn =
+            moduleContext.getServiceImpl(IPronghornService.class);
+        
         // Run the main floodlight module
         IFloodlightProviderService controller =
                 moduleContext.getServiceImpl(IFloodlightProviderService.class);
 
-        return controller;
+        return new ProviderPronghornTuple(pronghorn,controller);
+    }
+
+    public static class ProviderPronghornTuple
+    {
+        public IPronghornService pronghorn = null;
+        public IFloodlightProviderService floodlight_provider = null;
+
+        public ProviderPronghornTuple (
+            IPronghornService pronghorn,IFloodlightProviderService floodlight_provider)
+        {
+            this.pronghorn = pronghorn;
+            this.floodlight_provider = floodlight_provider;
+        }
     }
 }
