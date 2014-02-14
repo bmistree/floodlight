@@ -188,17 +188,17 @@ public class PronghornModule
 
 
     @Override
-    public int add_entry (PronghornFlowTableEntry entry) 
+    public int add_entry (PronghornFlowTableEntry entry,String switch_id)
         throws IOException, IllegalArgumentException        
     {
-        return send_flow_mod_msg(entry,true);
+        return send_flow_mod_msg(entry,switch_id);
     }
     
     @Override
-    public int remove_entry (PronghornFlowTableEntry entry)
+    public int remove_entry (PronghornFlowTableEntry entry,String switch_id)
         throws IOException, IllegalArgumentException
     {
-        return send_flow_mod_msg(entry,false);
+        return send_flow_mod_msg(entry,switch_id);
     }
 
     @Override
@@ -227,18 +227,18 @@ public class PronghornModule
     }
 
     private int send_flow_mod_msg (
-        PronghornFlowTableEntry entry, boolean add_msg)
+        PronghornFlowTableEntry entry,String switch_id)
         throws IOException, IllegalArgumentException
         
     {
-        long id = HexString.toLong(entry.switch_id);
+        long id = HexString.toLong(switch_id);
         IOFSwitch sw = floodlightProvider.getSwitch(id);
         ensureQueueExists(sw);
 
         int xid = sw.getNextTransactionId();
         OFFlowMod flow_mod_msg =
             entry.produce_flow_mod_msg(
-                xid,floodlightProvider,flow_entry_pusher,log,add_msg);
+                xid,floodlightProvider,flow_entry_pusher,log);
         sw.write(flow_mod_msg, null);
         return xid;
     }

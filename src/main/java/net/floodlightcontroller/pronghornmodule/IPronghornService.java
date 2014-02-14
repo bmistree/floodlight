@@ -11,9 +11,9 @@ public interface IPronghornService extends IFloodlightService {
     /**
        Returns unique id associated with 
      */
-    public int add_entry (PronghornFlowTableEntry entry)
+    public int add_entry (PronghornFlowTableEntry entry,String switch_id)
         throws IOException, IllegalArgumentException;
-    public int remove_entry (PronghornFlowTableEntry entry) 
+    public int remove_entry (PronghornFlowTableEntry entry, String switch_id) 
         throws IOException, IllegalArgumentException;
     public void barrier (
         String switch_id,IPronghornBarrierCallback cb) throws IOException;

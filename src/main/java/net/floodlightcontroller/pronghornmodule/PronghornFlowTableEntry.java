@@ -16,8 +16,13 @@ import net.floodlightcontroller.staticflowentry.IStaticFlowEntryPusherService;
 public class PronghornFlowTableEntry
 {
     public final static short DEFAULT_PRIORITY = 32767;
+
+    public enum Operation {
+        INSERT, REMOVE
+    }
+    public Operation op;
     
-    public String switch_id = null;
+    
     public String entry_name = null;
     public boolean active = false;
     public String actions = null;
@@ -39,23 +44,16 @@ public class PronghornFlowTableEntry
     public Integer src_port = null;
     public Integer dst_port = null;
 
-    
-    public PronghornFlowTableEntry(
-        String switch_id,String entry_name,boolean active,
-        String actions)
+    public PronghornFlowTableEntry(Operation op)
     {
-        this.switch_id = switch_id;
-        this.entry_name = entry_name;
-        this.active = active;
-        this.actions = actions;
+        this.op = op;
     }
-
 
     public OFFlowMod produce_flow_mod_msg(
         int xid,
         IFloodlightProviderService floodlight_provider,
         IStaticFlowEntryPusherService flow_entry_pusher,
-        Logger log, boolean add)  throws IllegalArgumentException 
+        Logger log)  throws IllegalArgumentException 
     {
         OFFlowMod flow_mod_msg =
             (OFFlowMod)floodlight_provider.getOFMessageFactory().getMessage(OFType.FLOW_MOD);
@@ -66,7 +64,7 @@ public class PronghornFlowTableEntry
         // this message is not a response to any packet in.
         flow_mod_msg.setBufferId(-1);
 
-        if (add)
+        if (op == Operation.INSERT)
             flow_mod_msg.setCommand(OFFlowMod.OFPFC_ADD);
         else
             flow_mod_msg.setCommand(OFFlowMod.OFPFC_DELETE_STRICT);
