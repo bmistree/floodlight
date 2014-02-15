@@ -64,8 +64,12 @@ public class Main {
     {
         // Load modules
         FloodlightModuleLoader fml = new FloodlightModuleLoader();
-        IFloodlightModuleContext moduleContext =
-            fml.loadModulesFromConfig(settings_filename);
+        IFloodlightModuleContext moduleContext = null;
+
+        if (settings_filename != null)
+            moduleContext = fml.loadModulesFromConfig(settings_filename);
+        else
+            moduleContext = fml.loadDefaultModules();
         
         // Run REST server
         IRestApiService restApi =

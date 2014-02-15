@@ -199,6 +199,19 @@ public class FloodlightModuleLoader implements IModuleService {
 
         return loadModulesFromList(configMods, prop);
     }
+
+    public IFloodlightModuleContext loadDefaultModules()
+        throws FloodlightModuleException
+    {
+        Properties prop = new Properties();
+        Collection<String> configMods;
+        logger.info("Loading default modules");
+        InputStream is = this.getClass().getClassLoader().
+            getResourceAsStream(COMPILED_CONF_FILE);
+        configMods = loadProperties(is, null, prop);
+        return loadModulesFromList(configMods, prop);
+    }
+    
     
     private Collection<String> loadProperties(InputStream is, 
                                               File confFile, 
