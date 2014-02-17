@@ -11,6 +11,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.io.IOException;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFFlowMod;
@@ -18,6 +19,7 @@ import org.openflow.protocol.OFType;
 import org.openflow.protocol.OFError;
 import org.openflow.util.HexString;
 
+import net.floodlightcontroller.threadpool.IThreadPoolService;
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.core.IOFMessageListener;
@@ -41,6 +43,7 @@ public class PronghornModule
     protected IFloodlightProviderService floodlightProvider;
     protected IRestApiService restApi;
     protected IStaticFlowEntryPusherService flow_entry_pusher;
+    protected IThreadPoolService threadpool_service;
     protected ConcurrentHashMap<IOFSwitch, BlockingQueue<OFMessage>> queues;
 
     protected PronghornSwitchListener switch_listener = new PronghornSwitchListener();
@@ -71,6 +74,7 @@ public class PronghornModule
         l.add(IFloodlightProviderService.class);
         l.add(IRestApiService.class);
         l.add(IStaticFlowEntryPusherService.class);
+        l.add(IThreadPoolService.class);
         return l;
     }
 
@@ -79,11 +83,21 @@ public class PronghornModule
         throws FloodlightModuleException {
         floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
         restApi = context.getServiceImpl(IRestApiService.class);
+        threadpool_service = context.getServiceImpl(IThreadPoolService.class);
+        
         flow_entry_pusher =
             context.getServiceImpl(IStaticFlowEntryPusherService.class);
         queues = new ConcurrentHashMap<IOFSwitch, BlockingQueue<OFMessage>>();
     }
 
+    @Override
+    public void shutdown_all_now()
+    {
+        ScheduledExecutorService executor_service = 
+            threadpool_service.getScheduledExecutor();
+        executor_service.shutdownNow();
+    }
+    
     @Override
     public void startUp(FloodlightModuleContext context)
     {
@@ -155,6 +169,7 @@ public class PronghornModule
         return Command.CONTINUE;
     }
 
+    
     /** IPronghornService interfaces*/        
     @Override
     public String sendBarrier(String switch_id)

@@ -22,4 +22,6 @@ public interface IPronghornService extends IFloodlightService {
         ISwitchAddedRemovedListener switch_added_removed_listener);
     public void unregister_switch_changes_listener(
         ISwitchAddedRemovedListener switch_added_removed_listener);
+
+    public void shutdown_all_now();
 }
