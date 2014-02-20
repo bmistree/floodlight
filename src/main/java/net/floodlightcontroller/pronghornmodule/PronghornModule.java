@@ -31,6 +31,8 @@ import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.restserver.IRestApiService;
 import net.floodlightcontroller.staticflowentry.IStaticFlowEntryPusherService;
+import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryListener;
+import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +47,7 @@ public class PronghornModule
     protected IRestApiService restApi;
     protected IStaticFlowEntryPusherService flow_entry_pusher;
     protected IThreadPoolService threadpool_service;
+    protected ILinkDiscoveryService link_discovery_service;
     protected ConcurrentHashMap<IOFSwitch, BlockingQueue<OFMessage>> queues;
     
     @Override
@@ -74,6 +77,7 @@ public class PronghornModule
         l.add(IRestApiService.class);
         l.add(IStaticFlowEntryPusherService.class);
         l.add(IThreadPoolService.class);
+        l.add(ILinkDiscoveryService.class);
         return l;
     }
 
@@ -83,6 +87,7 @@ public class PronghornModule
         floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
         restApi = context.getServiceImpl(IRestApiService.class);
         threadpool_service = context.getServiceImpl(IThreadPoolService.class);
+        link_discovery_service = context.getServiceImpl(ILinkDiscoveryService.class);
         
         flow_entry_pusher =
             context.getServiceImpl(IStaticFlowEntryPusherService.class);
@@ -105,6 +110,7 @@ public class PronghornModule
         restApi.addRestletRoutable(new PronghornWebRoutable());
     }
 
+    
     @Override
     public void register_switch_listener(IOFSwitchListener switch_listener)
     {
@@ -117,6 +123,13 @@ public class PronghornModule
         floodlightProvider.removeOFSwitchListener(switch_listener);
     }
 
+    @Override
+    public void register_link_discovery_listener(ILinkDiscoveryListener listener)
+    {
+        link_discovery_service.addListener(listener);
+    }
+
+    
     @Override
     public String getName() {
         return "PronghornModule";
