@@ -1,7 +1,7 @@
 package net.floodlightcontroller.pronghornmodule;
 
 import java.io.IOException;
-
+import net.floodlightcontroller.core.IOFSwitchListener;
 import net.floodlightcontroller.core.module.IFloodlightService;
 
 
@@ -18,10 +18,8 @@ public interface IPronghornService extends IFloodlightService {
     public void barrier (
         String switch_id,IPronghornBarrierCallback cb) throws IOException;
 
-    public void register_switch_changes_listener(
-        ISwitchAddedRemovedListener switch_added_removed_listener);
-    public void unregister_switch_changes_listener(
-        ISwitchAddedRemovedListener switch_added_removed_listener);
+    public void register_switch_listener(IOFSwitchListener switch_listener);
+    public void unregister_switch_listener(IOFSwitchListener switch_listener);
 
     public void shutdown_all_now();
 }

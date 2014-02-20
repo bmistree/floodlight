@@ -24,6 +24,7 @@ import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.core.IOFMessageListener;
 import net.floodlightcontroller.core.IOFSwitch;
+import net.floodlightcontroller.core.IOFSwitchListener;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
@@ -45,8 +46,6 @@ public class PronghornModule
     protected IStaticFlowEntryPusherService flow_entry_pusher;
     protected IThreadPoolService threadpool_service;
     protected ConcurrentHashMap<IOFSwitch, BlockingQueue<OFMessage>> queues;
-
-    protected PronghornSwitchListener switch_listener = new PronghornSwitchListener();
     
     @Override
     public Collection<Class<? extends IFloodlightService>> getModuleServices()
@@ -104,10 +103,20 @@ public class PronghornModule
         floodlightProvider.addOFMessageListener(OFType.BARRIER_REPLY, this);
         floodlightProvider.addOFMessageListener(OFType.ERROR, this);
         restApi.addRestletRoutable(new PronghornWebRoutable());
-
-        switch_listener.init(floodlightProvider,log);
     }
-    
+
+    @Override
+    public void register_switch_listener(IOFSwitchListener switch_listener)
+    {
+        floodlightProvider.addOFSwitchListener(switch_listener);
+        
+    }
+    @Override
+    public void unregister_switch_listener(IOFSwitchListener switch_listener)
+    {
+        floodlightProvider.removeOFSwitchListener(switch_listener);
+    }
+
     @Override
     public String getName() {
         return "PronghornModule";
@@ -214,21 +223,6 @@ public class PronghornModule
         throws IOException, IllegalArgumentException
     {
         return send_flow_mod_msg(entry,switch_id);
-    }
-
-    @Override
-    public void register_switch_changes_listener(
-        ISwitchAddedRemovedListener switch_added_removed_listener)
-    {
-        switch_listener.register_switch_changes_listener(
-            switch_added_removed_listener);
-    }
-    @Override
-    public void unregister_switch_changes_listener(
-        ISwitchAddedRemovedListener switch_added_removed_listener)
-    {
-        switch_listener.unregister_switch_changes_listener(
-            switch_added_removed_listener);
     }
 
     @Override
