@@ -12,12 +12,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Future;
+import java.util.List;
 
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFFlowMod;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.OFError;
 import org.openflow.util.HexString;
+import org.openflow.protocol.statistics.OFStatistics;
+import org.openflow.protocol.OFStatisticsRequest;
 
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 import net.floodlightcontroller.core.FloodlightContext;
@@ -265,6 +269,21 @@ public class PronghornModule
         return xid;
     }
     
+
+    /**
+       @returns {List<OFStatistics> or null} --- null if switch does
+       not exist.
+     */
+    public Future<List<OFStatistics>> get_stats(String switch_id)
+        throws IOException
+    {
+        long id = HexString.toLong(switch_id);
+        IOFSwitch sw = floodlightProvider.getSwitch(id);
+        if (sw == null)
+            return null;
+        return sw.queryStatistics(new OFStatisticsRequest());
+    }
+
     
     /**
        @returns {boolean} --- True if the barrier completes before
