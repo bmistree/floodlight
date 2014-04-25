@@ -30,8 +30,21 @@ public interface IPronghornService extends IFloodlightService {
 
     public void register_link_discovery_listener(ILinkDiscoveryListener listener);
 
-    public Future<List<OFStatistics>> get_stats(String switch_id)
+
+    /**
+       @returns {List<OFStatistics> or null} --- null if switch does
+       not exist.
+     */
+    public Future<List<OFStatistics>> get_aggregate_stats(String switch_id)
         throws IOException;
+
+    /**
+       @returns {List<OFStatistics> or null} --- null if switch does
+       not exist.
+     */
+    public Future<List<OFStatistics>> get_port_stats(String switch_id)
+        throws IOException;
+
     
     // note: link discovery service provides no way to actually unregister.
     //public void unregister_link_discovery_listener(ILinkDiscoveryListener listener);

@@ -22,6 +22,7 @@ import org.openflow.protocol.OFError;
 import org.openflow.util.HexString;
 import org.openflow.protocol.statistics.OFStatistics;
 import org.openflow.protocol.OFStatisticsRequest;
+import org.openflow.protocol.statistics.OFStatisticsType;
 
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 import net.floodlightcontroller.core.FloodlightContext;
@@ -274,15 +275,32 @@ public class PronghornModule
        @returns {List<OFStatistics> or null} --- null if switch does
        not exist.
      */
-    public Future<List<OFStatistics>> get_stats(String switch_id)
+    public Future<List<OFStatistics>> get_aggregate_stats(
+        String switch_id) throws IOException
+    {
+        return internal_get_stats(switch_id,OFStatisticsType.AGGREGATE);
+    }
+
+    public Future<List<OFStatistics>> get_port_stats(String switch_id)
         throws IOException
+    {
+        return internal_get_stats(switch_id,OFStatisticsType.PORT);
+    }
+
+    private Future<List<OFStatistics>> internal_get_stats(
+        String switch_id, OFStatisticsType stats_type) throws IOException
     {
         long id = HexString.toLong(switch_id);
         IOFSwitch sw = floodlightProvider.getSwitch(id);
         if (sw == null)
             return null;
-        return sw.queryStatistics(new OFStatisticsRequest());
+
+        OFStatisticsRequest ofsr = new OFStatisticsRequest();
+        ofsr.setStatisticType(stats_type);
+        return sw.queryStatistics(ofsr);
     }
+
+    
 
     
     /**
@@ -350,5 +368,4 @@ public class PronghornModule
             // END DEBUG
         }
     }
-    
 }
