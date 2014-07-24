@@ -1,6 +1,6 @@
 package com.bigswitch.floodlight.vendor;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 import org.openflow.protocol.action.OFActionVendor;
 
 public abstract class OFActionBigSwitchVendor extends OFActionVendor {
@@ -25,15 +25,15 @@ public abstract class OFActionBigSwitchVendor extends OFActionVendor {
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        this.subtype = data.readInt();
+        this.subtype = data.getInt();
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeInt(this.subtype);
+        data.putInt(this.subtype);
     }
 
     @Override

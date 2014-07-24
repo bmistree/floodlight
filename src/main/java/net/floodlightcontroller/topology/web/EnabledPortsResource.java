@@ -47,9 +47,9 @@ public class EnabledPortsResource extends ServerResource {
         if (switches == null) return result;
 
         for(long sw: switches) {
-            Set<Short> ports = topology.getPorts(sw);
+            Set<Integer> ports = topology.getPorts(sw);
             if (ports == null) continue;
-            for(short p: ports) {
+            for(int p: ports) {
                 result.add(new NodePortTuple(sw, p));
             }
         }

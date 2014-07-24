@@ -47,6 +47,7 @@ import net.floodlightcontroller.util.MACAddress;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
+import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFPacketIn;
 import org.openflow.protocol.OFPacketIn.OFPacketInReason;
 import org.openflow.protocol.OFType;
@@ -210,7 +211,7 @@ public class FirewallTest extends FloodlightTestCase {
         // Build the PacketIn
         this.packetIn = ((OFPacketIn) mockFloodlightProvider.getOFMessageFactory().getMessage(OFType.PACKET_IN))
                 .setBufferId(-1)
-                .setInPort((short) 1)
+                .setMatch(new OFMatch().setInPort(1))
                 .setPacketData(serializedPacket)
                 .setReason(OFPacketInReason.NO_MATCH)
                 .setTotalLength((short) serializedPacket.length);

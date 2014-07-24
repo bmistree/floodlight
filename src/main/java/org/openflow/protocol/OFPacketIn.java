@@ -1,25 +1,8 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.util.U16;
 import org.openflow.util.U32;
 import org.openflow.util.U8;
@@ -30,16 +13,18 @@ import org.openflow.util.U8;
  * @author David Erickson (daviderickson@cs.stanford.edu) - Feb 8, 2010
  */
 public class OFPacketIn extends OFMessage {
-    public static short MINIMUM_LENGTH = 18;
+    public static int MINIMUM_LENGTH = 32;
 
     public enum OFPacketInReason {
-        NO_MATCH, ACTION
+        NO_MATCH, ACTION, INVALID_TTL
     }
 
     protected int bufferId;
     protected short totalLength;
-    protected short inPort;
     protected OFPacketInReason reason;
+    protected byte tableId;
+    protected long cookie;    
+    protected OFMatch match;
     protected byte[] packetData;
 
     public OFPacketIn() {
@@ -66,6 +51,57 @@ public class OFPacketIn extends OFMessage {
     }
 
     /**
+     * Get cookie
+     * @return
+     */
+    public long getCookie() {
+        return this.cookie;
+    }
+
+    /**
+     * Set cookie
+     * @param cookie
+     */
+    public OFPacketIn setCookie(long cookie) {
+        this.cookie = cookie;
+        return this;
+    }
+
+    /**
+     * Get tableId
+     * @return
+     */
+    public byte getTableId() {
+        return this.tableId;
+    }
+
+    /**
+     * Set tableId
+     * @param tableId
+     */
+    public OFPacketIn setTableId(byte tableId) {
+        this.tableId = tableId;
+        return this;
+    }
+
+    /**
+     * Get match
+     * @return
+     */
+    public OFMatch getMatch() {
+        return this.match;
+    }
+
+    /**
+     * Set match
+     * @param match
+     */
+    public OFPacketIn setMatch(OFMatch match) {
+        this.match = match;
+        return this;
+    }
+
+    /**
      * Returns the packet data
      * @return
      */
@@ -87,17 +123,12 @@ public class OFPacketIn extends OFMessage {
      * Get in_port
      * @return
      */
-    public short getInPort() {
-        return this.inPort;
-    }
-
-    /**
-     * Set in_port
-     * @param inPort
-     */
-    public OFPacketIn setInPort(short inPort) {
-        this.inPort = inPort;
-        return this;
+    public int getInPort() {
+        for (OFMatchField matchField: match.matchFields) {
+            if (matchField.getType() == OFOXMFieldType.IN_PORT)
+                return (Integer) matchField.value;
+        }
+        return -1;
     }
 
     /**
@@ -135,26 +166,34 @@ public class OFPacketIn extends OFMessage {
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        this.bufferId = data.readInt();
-        this.totalLength = data.readShort();
-        this.inPort = data.readShort();
-        this.reason = OFPacketInReason.values()[U8.f(data.readByte())];
-        data.readByte(); // pad
-        this.packetData = new byte[getLengthU() - MINIMUM_LENGTH];
-        data.readBytes(this.packetData);
+        this.bufferId = data.getInt();
+        this.totalLength = data.getShort();
+        this.reason = OFPacketInReason.values()[U8.f(data.get())];
+        this.tableId = data.get();
+        this.cookie = data.getLong();
+        if (this.match == null)
+            this.match = new OFMatch();
+        this.match.readFrom(data);
+        data.getShort(); // pad
+
+        // safeguard in case miss_send_len is left at default value of 128 bytes
+        this.packetData = new byte[Math.min(data.remaining(), getTotalLength())];
+        data.get(this.packetData);
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeInt(bufferId);
-        data.writeShort(totalLength);
-        data.writeShort(inPort);
-        data.writeByte((byte) reason.ordinal());
-        data.writeByte((byte) 0x0); // pad
-        data.writeBytes(this.packetData);
+        data.putInt(bufferId);
+        data.putShort(totalLength);
+        data.put((byte) reason.ordinal());
+        data.put(tableId);
+        data.putLong(cookie);
+        this.match.writeTo(data);
+        data.putShort((short) 0x0); // pad
+        data.put(this.packetData);
     }
 
     @Override
@@ -162,10 +201,12 @@ public class OFPacketIn extends OFMessage {
         final int prime = 283;
         int result = super.hashCode();
         result = prime * result + bufferId;
-        result = prime * result + inPort;
         result = prime * result + Arrays.hashCode(packetData);
         result = prime * result + ((reason == null) ? 0 : reason.hashCode());
         result = prime * result + totalLength;
+        result = prime * result + reason.ordinal();
+        result = prime * result + tableId;
+        result = prime * result + (int) (cookie ^ (cookie >>> 32));
         return result;
     }
 
@@ -184,9 +225,6 @@ public class OFPacketIn extends OFMessage {
         if (bufferId != other.bufferId) {
             return false;
         }
-        if (inPort != other.inPort) {
-            return false;
-        }
         if (!Arrays.equals(packetData, other.packetData)) {
             return false;
         }
@@ -197,15 +235,44 @@ public class OFPacketIn extends OFMessage {
         } else if (!reason.equals(other.reason)) {
             return false;
         }
+        if (tableId != other.tableId) {
+            return false;
+        }
+        if (cookie != other.cookie) {
+            return false;
+        }
         if (totalLength != other.totalLength) {
+            return false;
+        }
+        if (match == null) {
+            if (other.match != null) {
+                return false;
+            }
+        } else if (!match.equals(other.match)) {
             return false;
         }
         return true;
     }
 
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
     public String toString() {
-        String myStr = super.toString();
-        return "packetIn" +
-            ":bufferId=" + U32.f(this.bufferId) + myStr;
+        return "OFPacketIn [bufferId=" + U32.f(bufferId) + ", totalLength=" + totalLength + 
+                ", reason=" + reason.ordinal() + ", tableId=" + tableId + ", cookie=" + cookie + 
+                ", match=" + match + ", length=" + length + "]";
     }
+
+    /* (non-Javadoc)
+     * @see org.openflow.protocol.OFMessage#computeLength()
+     */
+    @Override
+    public void computeLength() {
+        int l = MINIMUM_LENGTH - OFMatch.MINIMUM_LENGTH;
+        l += match.getLength();
+        l += ((packetData != null) ? packetData.length : 0);
+        this.length = U16.t(l);
+    }
+
 }

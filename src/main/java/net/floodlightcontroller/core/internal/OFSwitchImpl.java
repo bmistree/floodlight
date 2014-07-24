@@ -34,13 +34,13 @@ public class OFSwitchImpl extends OFSwitchBase {
     }
 
     @Override
-    public OFPortType getPortType(short port_num) {
+    public OFPortType getPortType(int port_num) {
         return OFPortType.NORMAL;
     }
 
     @Override
     @JsonIgnore
-    public boolean isFastPort(short port_num) {
+    public boolean isFastPort(int port_num) {
         return false;
     }
 }

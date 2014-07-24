@@ -235,7 +235,7 @@ public class VirtualNetworkFilter
             macToGuid.put(mac, guid);
             portToMac.put(port, mac);
             if(vNetsByGuid.get(guid)!=null)
-                vNetsByGuid.get(guid).addHost(new MACAddress(mac.toBytes()));
+                vNetsByGuid.get(guid).addHost(port,new MACAddress(mac.toBytes()));
         } else {
             log.warn("Could not add MAC {} to network ID {} on port {}, the network does not exist",
                      new Object[] {mac, guid, port});
@@ -250,9 +250,10 @@ public class VirtualNetworkFilter
         if (mac == null && port == null) return;
         if (port != null) {
             MACAddress host = portToMac.remove(port);
-            if(vNetsByGuid.get(macToGuid.get(host)) != null)
+            if(host !=null && vNetsByGuid.get(macToGuid.get(host)) != null)
                 vNetsByGuid.get(macToGuid.get(host)).removeHost(host);
-            macToGuid.remove(host);
+			if(host !=null)
+	            macToGuid.remove(host);
         } else if (mac != null) {
             if (!portToMac.isEmpty()) {
                 for (Entry<String, MACAddress> entry : portToMac.entrySet()) {
@@ -471,14 +472,13 @@ public class VirtualNetworkFilter
             (OFFlowMod) floodlightProvider.getOFMessageFactory().getMessage(OFType.FLOW_MOD);
         OFMatch match = new OFMatch();
         match.loadFromPacket(pi.getPacketData(), pi.getInPort());
-        List<OFAction> actions = new ArrayList<OFAction>(); // no actions = drop
         long cookie = AppCookie.makeCookie(APP_ID, 0);
         fm.setCookie(cookie)
         .setIdleTimeout(ForwardingBase.FLOWMOD_DEFAULT_IDLE_TIMEOUT)
         .setHardTimeout(ForwardingBase.FLOWMOD_DEFAULT_HARD_TIMEOUT)
         .setBufferId(OFPacketOut.BUFFER_ID_NONE)
         .setMatch(match)
-        .setActions(actions)
+        // no instructions = drop
         .setLengthU(OFFlowMod.MINIMUM_LENGTH);
 //        fm.setFlags(OFFlowMod.OFPFF_SEND_FLOW_REM);
         try {

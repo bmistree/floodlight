@@ -46,15 +46,15 @@ public interface ILinkDiscovery {
 
     public class LDUpdate {
         protected long src;
-        protected short srcPort;
+        protected int srcPort;
         protected long dst;
-        protected short dstPort;
+        protected int dstPort;
         protected SwitchType srcType;
         protected LinkType type;
         protected UpdateOperation operation;
 
-        public LDUpdate(long src, short srcPort,
-                      long dst, short dstPort,
+        public LDUpdate(long src, int srcPort,
+                      long dst, int dstPort,
                       ILinkDiscovery.LinkType type,
                       UpdateOperation operation) {
             this.src = src;
@@ -83,7 +83,7 @@ public interface ILinkDiscovery {
         }
 
         // For port up or port down; and tunnel port added and removed.
-        public LDUpdate(long sw, short port, UpdateOperation operation) {
+        public LDUpdate(long sw, int port, UpdateOperation operation) {
             this.src = sw;
             this.srcPort = port;
             this.operation = operation;
@@ -93,7 +93,7 @@ public interface ILinkDiscovery {
             return src;
         }
 
-        public short getSrcPort() {
+        public int getSrcPort() {
             return srcPort;
         }
 
@@ -101,7 +101,7 @@ public interface ILinkDiscovery {
             return dst;
         }
 
-        public short getDstPort() {
+        public int getDstPort() {
             return dstPort;
         }
 

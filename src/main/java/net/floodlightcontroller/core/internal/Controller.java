@@ -101,7 +101,7 @@ import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFPacketIn;
 import org.openflow.protocol.OFType;
-import org.openflow.protocol.factory.BasicFactory;
+import org.openflow.protocol.factory.FloodlightFactory;
 import org.openflow.protocol.statistics.OFDescriptionStatistics;
 import org.openflow.util.HexString;
 import org.openflow.vendor.nicira.OFNiciraVendorExtensions;
@@ -135,7 +135,7 @@ public class Controller implements IFloodlightProviderService,
     static final String SWITCH_SYNC_STORE_NAME =
             Controller.class.getCanonicalName() + ".stateStore";
 
-    protected BasicFactory factory;
+    protected FloodlightFactory factory;
     protected ConcurrentMap<OFType,
                             ListenerDispatcher<OFType,IOFMessageListener>>
                                 messageListeners;
@@ -2034,7 +2034,7 @@ public class Controller implements IFloodlightProviderService,
         if (bc == null)
             bc = new FloodlightContext();
         if (log.isTraceEnabled()) {
-            String str = OFMessage.getDataAsString(sw, m, bc);
+            String str = m.toString();
             log.trace("{}", str);
         }
 
@@ -2054,7 +2054,7 @@ public class Controller implements IFloodlightProviderService,
     }
 
     @Override
-    public BasicFactory getOFMessageFactory() {
+    public FloodlightFactory getOFMessageFactory() {
         return factory;
     }
 
@@ -2253,7 +2253,7 @@ public class Controller implements IFloodlightProviderService,
         this.driverRegistry = new NaiiveSwitchDriverRegistry();
         this.controllerNodeIPsCache = new HashMap<String, String>();
         this.updates = new LinkedBlockingQueue<IUpdate>();
-        this.factory = BasicFactory.getInstance();
+        this.factory = FloodlightFactory.getInstance();
         this.providerMap = new HashMap<String, List<IInfoProvider>>();
         setConfigParams(configParams);
         Role initialRole = getInitialRole(configParams);

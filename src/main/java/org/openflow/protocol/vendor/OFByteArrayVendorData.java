@@ -17,7 +17,7 @@
 
 package org.openflow.protocol.vendor;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 
 /**
  * Basic implementation of OFVendorData that just treats the data as a
@@ -72,23 +72,23 @@ public class OFByteArrayVendorData implements OFVendorData {
     }
 
     /**
-     * Read the vendor data from the ChannelBuffer into the byte array.
+     * Read the vendor data from the ByteBuffer into the byte array.
      * @param data the channel buffer from which we're deserializing
      * @param length the length to the end of the enclosing message
      */
     @Override
-    public void readFrom(ChannelBuffer data, int length) {
+    public void readFrom(ByteBuffer data, int length) {
         bytes = new byte[length];
-        data.readBytes(bytes);
+        data.get(bytes);
     }
 
     /**
-     * Write the vendor data bytes to the ChannelBuffer
+     * Write the vendor data bytes to the ByteBuffer
      * @param data the channel buffer to which we're serializing
      */
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         if (bytes != null)
-            data.writeBytes(bytes);
+            data.put(bytes);
     }
 }

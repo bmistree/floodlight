@@ -37,9 +37,9 @@ import net.floodlightcontroller.routing.Link;
 @JsonSerialize(using=LinkWithType.class)
 public class LinkWithType extends JsonSerializer<LinkWithType> {
     public long srcSwDpid;
-    public short srcPort;
+    public int srcPort;
     public long dstSwDpid;
-    public short dstPort;
+    public int dstPort;
     public LinkType type;
     public LinkDirection direction;
 

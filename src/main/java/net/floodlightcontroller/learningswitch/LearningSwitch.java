@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,11 +56,14 @@ import net.floodlightcontroller.restserver.IRestApiService;
 import org.openflow.protocol.OFFlowMod;
 import org.openflow.protocol.OFFlowRemoved;
 import org.openflow.protocol.OFMatch;
+import org.openflow.protocol.OFOXMFieldType;
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFPacketIn;
 import org.openflow.protocol.OFPacketOut;
 import org.openflow.protocol.OFPort;
 import org.openflow.protocol.OFType;
+import org.openflow.protocol.instruction.OFInstruction;
+import org.openflow.protocol.instruction.OFInstructionApplyActions;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
 import org.openflow.util.HexString;
@@ -77,7 +81,7 @@ public class LearningSwitch
     protected IRestApiService restApi;
 
     // Stores the learned state for each switch
-    protected Map<IOFSwitch, Map<MacVlanPair,Short>> macVlanToSwitchPortMap;
+    protected Map<IOFSwitch, Map<MacVlanPair,Integer>> macVlanToSwitchPortMap;
 
     // flow-mod - for use in the cookie
     public static final int LEARNING_SWITCH_APP_ID = 1;
@@ -117,8 +121,8 @@ public class LearningSwitch
      * @param vlan The VLAN that the host is on
      * @param portVal The switchport that the host is on
      */
-    protected void addToPortMap(IOFSwitch sw, long mac, short vlan, short portVal) {
-        Map<MacVlanPair,Short> swMap = macVlanToSwitchPortMap.get(sw);
+    protected void addToPortMap(IOFSwitch sw, long mac, short vlan, int portVal) {
+        Map<MacVlanPair,Integer> swMap = macVlanToSwitchPortMap.get(sw);
 
         if (vlan == (short) 0xffff) {
             // OFMatch.loadFromPacket sets VLAN ID to 0xffff if the packet contains no VLAN tag;
@@ -128,7 +132,7 @@ public class LearningSwitch
 
         if (swMap == null) {
             // May be accessed by REST API so we need to make it thread safe
-            swMap = Collections.synchronizedMap(new LRULinkedHashMap<MacVlanPair,Short>(MAX_MACS_PER_SWITCH));
+            swMap = Collections.synchronizedMap(new LRULinkedHashMap<MacVlanPair,Integer>(MAX_MACS_PER_SWITCH));
             macVlanToSwitchPortMap.put(sw, swMap);
         }
         swMap.put(new MacVlanPair(mac, vlan), portVal);
@@ -144,7 +148,7 @@ public class LearningSwitch
         if (vlan == (short) 0xffff) {
             vlan = 0;
         }
-        Map<MacVlanPair,Short> swMap = macVlanToSwitchPortMap.get(sw);
+        Map<MacVlanPair,Integer> swMap = macVlanToSwitchPortMap.get(sw);
         if (swMap != null)
             swMap.remove(new MacVlanPair(mac, vlan));
     }
@@ -156,11 +160,11 @@ public class LearningSwitch
      * @param vlan The VLAN number to get
      * @return The port the host is on
      */
-    public Short getFromPortMap(IOFSwitch sw, long mac, short vlan) {
+    public Integer getFromPortMap(IOFSwitch sw, long mac, short vlan) {
         if (vlan == (short) 0xffff) {
             vlan = 0;
         }
-        Map<MacVlanPair,Short> swMap = macVlanToSwitchPortMap.get(sw);
+        Map<MacVlanPair,Integer> swMap = macVlanToSwitchPortMap.get(sw);
         if (swMap != null)
             return swMap.get(new MacVlanPair(mac, vlan));
 
@@ -180,13 +184,13 @@ public class LearningSwitch
      * @param sw The switch to clear the mapping for
      */
     public void clearLearnedTable(IOFSwitch sw) {
-        Map<MacVlanPair, Short> swMap = macVlanToSwitchPortMap.get(sw);
+        Map<MacVlanPair, Integer> swMap = macVlanToSwitchPortMap.get(sw);
         if (swMap != null)
             swMap.clear();
     }
 
     @Override
-    public synchronized Map<IOFSwitch, Map<MacVlanPair,Short>> getTable() {
+    public synchronized Map<IOFSwitch, Map<MacVlanPair,Integer>> getTable() {
         return macVlanToSwitchPortMap;
     }
 
@@ -198,8 +202,8 @@ public class LearningSwitch
      * @param match The OFMatch structure to write.
      * @param outPort The switch port to output it to.
      */
-    private void writeFlowMod(IOFSwitch sw, short command, int bufferId,
-            OFMatch match, short outPort) {
+    private void writeFlowMod(IOFSwitch sw, byte command, int bufferId,
+            OFMatch match, int outPort) {
         // from openflow 1.0 spec - need to set these on a struct ofp_flow_mod:
         // struct ofp_flow_mod {
         //    struct ofp_header header;
@@ -215,7 +219,7 @@ public class LearningSwitch
         //                           Not meaningful for OFPFC_DELETE*. */
         //    uint16_t out_port; /* For OFPFC_DELETE* commands, require
         //                          matching entries to include this as an
-        //                          output port. A value of OFPP_NONE
+        //                          output port. A value of OFPP_ANY
         //                          indicates no restriction. */
         //    uint16_t flags; /* One of OFPFF_*. */
         //    struct ofp_action_header actions[0]; /* The action length is inferred
@@ -231,7 +235,7 @@ public class LearningSwitch
         flowMod.setHardTimeout(LearningSwitch.FLOWMOD_DEFAULT_HARD_TIMEOUT);
         flowMod.setPriority(LearningSwitch.FLOWMOD_PRIORITY);
         flowMod.setBufferId(bufferId);
-        flowMod.setOutPort((command == OFFlowMod.OFPFC_DELETE) ? outPort : OFPort.OFPP_NONE.getValue());
+        flowMod.setOutPort((command == OFFlowMod.OFPFC_DELETE) ? outPort : OFPort.OFPP_ANY.getValue());
         flowMod.setFlags((command == OFFlowMod.OFPFC_DELETE) ? 0 : (short) (1 << 0)); // OFPFF_SEND_FLOW_REM
 
         // set the ofp_action_header/out actions:
@@ -242,8 +246,9 @@ public class LearningSwitch
         // uint16_t max_len; /* Max length to send to controller. */
         // type/len are set because it is OFActionOutput,
         // and port, max_len are arguments to this constructor
-        flowMod.setActions(Arrays.asList((OFAction) new OFActionOutput(outPort, (short) 0xffff)));
-        flowMod.setLength((short) (OFFlowMod.MINIMUM_LENGTH + OFActionOutput.MINIMUM_LENGTH));
+        List<OFAction> actions = Arrays.asList((OFAction) new OFActionOutput(outPort, (short) 0xffff));
+        List<OFInstruction> instructions = Arrays.asList((OFInstruction) new OFInstructionApplyActions().setActions(actions));
+        flowMod.setInstructions(instructions);
 
         if (log.isTraceEnabled()) {
             log.trace("{} {} flow mod {}",
@@ -270,7 +275,7 @@ public class LearningSwitch
      * @param pi        packet-in
      * @param outport   output port
      */
-    private void pushPacket(IOFSwitch sw, OFMatch match, OFPacketIn pi, short outport) {
+    private void pushPacket(IOFSwitch sw, OFMatch match, OFPacketIn pi, int outport) {
         if (pi == null) {
             return;
         }
@@ -301,10 +306,7 @@ public class LearningSwitch
         List<OFAction> actions = new ArrayList<OFAction>();
         actions.add(new OFActionOutput(outport, (short) 0xffff));
 
-        po.setActions(actions)
-          .setActionsLength((short) OFActionOutput.MINIMUM_LENGTH);
-        short poLength =
-                (short) (po.getActionsLength() + OFPacketOut.MINIMUM_LENGTH);
+        po.setActions(actions);
 
         // If the switch doens't support buffering set the buffer id to be none
         // otherwise it'll be the the buffer id of the PacketIn
@@ -322,11 +324,8 @@ public class LearningSwitch
         // we send the data with the packet out
         if (pi.getBufferId() == OFPacketOut.BUFFER_ID_NONE) {
             byte[] packetData = pi.getPacketData();
-            poLength += packetData.length;
             po.setPacketData(packetData);
         }
-
-        po.setLength(poLength);
 
         try {
             counterStore.updatePktOutFMCounterStoreLocal(sw, po);
@@ -344,10 +343,10 @@ public class LearningSwitch
      */
     private void writePacketOutForPacketIn(IOFSwitch sw,
                                           OFPacketIn packetInMessage,
-                                          short egressPort) {
+                                          int egressPort) {
         // from openflow 1.0 spec - need to set these on a struct ofp_packet_out:
         // uint32_t buffer_id; /* ID assigned by datapath (-1 if none). */
-        // uint16_t in_port; /* Packet's input port (OFPP_NONE if none). */
+        // uint16_t in_port; /* Packet's input port (OFPP_ANY if none). */
         // uint16_t actions_len; /* Size of action array in bytes. */
         // struct ofp_action_header actions[0]; /* Actions. */
         /* uint8_t data[0]; */ /* Packet data. The length is inferred
@@ -355,13 +354,10 @@ public class LearningSwitch
                                   (Only meaningful if buffer_id == -1.) */
 
         OFPacketOut packetOutMessage = (OFPacketOut) floodlightProvider.getOFMessageFactory().getMessage(OFType.PACKET_OUT);
-        short packetOutLength = (short)OFPacketOut.MINIMUM_LENGTH; // starting length
 
         // Set buffer_id, in_port, actions_len
         packetOutMessage.setBufferId(packetInMessage.getBufferId());
         packetOutMessage.setInPort(packetInMessage.getInPort());
-        packetOutMessage.setActionsLength((short)OFActionOutput.MINIMUM_LENGTH);
-        packetOutLength += OFActionOutput.MINIMUM_LENGTH;
 
         // set actions
         List<OFAction> actions = new ArrayList<OFAction>(1);
@@ -372,11 +368,7 @@ public class LearningSwitch
         if (packetInMessage.getBufferId() == OFPacketOut.BUFFER_ID_NONE) {
             byte[] packetData = packetInMessage.getPacketData();
             packetOutMessage.setPacketData(packetData);
-            packetOutLength += (short)packetData.length;
         }
-
-        // finally, set the total length
-        packetOutMessage.setLength(packetOutLength);
 
         // and write it out
         try {
@@ -416,7 +408,7 @@ public class LearningSwitch
         }
 
         // Now output flow-mod and/or packet
-        Short outPort = getFromPortMap(sw, destMac, vlan);
+        Integer outPort = getFromPortMap(sw, destMac, vlan);
         if (outPort == null) {
             // If we haven't learned the port for the dest MAC/VLAN, flood it
             // Don't flood broadcast packets if the broadcast is disabled.
@@ -424,7 +416,7 @@ public class LearningSwitch
             //     from port map whenever a flow expires, so you would still see
             //     a lot of floods.
             this.writePacketOutForPacketIn(sw, pi, OFPort.OFPP_FLOOD.getValue());
-        } else if (outPort == match.getInputPort()) {
+        } else if (outPort == match.getInPort()) {
             log.trace("ignoring packet that arrived on same port as learned destination:"
                     + " switch {} vlan {} dest MAC {} port {}",
                     new Object[]{ sw, vlan, HexString.toHexString(destMac), outPort });
@@ -438,10 +430,11 @@ public class LearningSwitch
             // its former location does not keep the stale entry alive forever.
             // FIXME: current HP switches ignore DL_SRC and DL_DST fields, so we have to match on
             // NW_SRC and NW_DST as well
-            match.setWildcards(((Integer)sw.getAttribute(IOFSwitch.PROP_FASTWILDCARDS)).intValue()
-                    & ~OFMatch.OFPFW_IN_PORT
-                    & ~OFMatch.OFPFW_DL_VLAN & ~OFMatch.OFPFW_DL_SRC & ~OFMatch.OFPFW_DL_DST
-                    & ~OFMatch.OFPFW_NW_SRC_MASK & ~OFMatch.OFPFW_NW_DST_MASK);
+
+        	match.setNonWildcards(EnumSet.of(OFOXMFieldType.IN_PORT, OFOXMFieldType.VLAN_VID, 
+        			OFOXMFieldType.ETH_SRC, OFOXMFieldType.ETH_DST,
+                    OFOXMFieldType.IPV4_SRC, OFOXMFieldType.IPV4_DST));
+        	
             // We write FlowMods with Buffer ID none then explicitly PacketOut the buffered packet
             this.pushPacket(sw, match, pi, outPort);
             this.writeFlowMod(sw, OFFlowMod.OFPFC_ADD, OFPacketOut.BUFFER_ID_NONE, match, outPort);
@@ -453,8 +446,8 @@ public class LearningSwitch
                     .setNetworkDestination(match.getNetworkSource())
                     .setTransportSource(match.getTransportDestination())
                     .setTransportDestination(match.getTransportSource())
-                    .setInputPort(outPort),
-                    match.getInputPort());
+                    .setInPort(outPort),
+                    match.getInPort());
             }
         }
         return Command.CONTINUE;
@@ -488,16 +481,14 @@ public class LearningSwitch
         // send the packets to the wrong port (the matching input port of the
         // expired flow entry), so we must delete the reverse entry explicitly.
         this.writeFlowMod(sw, OFFlowMod.OFPFC_DELETE, -1, match.clone()
-                .setWildcards(((Integer)sw.getAttribute(IOFSwitch.PROP_FASTWILDCARDS)).intValue()
-                        & ~OFMatch.OFPFW_DL_VLAN & ~OFMatch.OFPFW_DL_SRC & ~OFMatch.OFPFW_DL_DST
-                        & ~OFMatch.OFPFW_NW_SRC_MASK & ~OFMatch.OFPFW_NW_DST_MASK)
                 .setDataLayerSource(match.getDataLayerDestination())
                 .setDataLayerDestination(match.getDataLayerSource())
+                .setDataLayerVirtualLan(match.getDataLayerVirtualLan())
                 .setNetworkSource(match.getNetworkDestination())
                 .setNetworkDestination(match.getNetworkSource())
                 .setTransportSource(match.getTransportDestination())
                 .setTransportDestination(match.getTransportSource()),
-                match.getInputPort());
+                match.getInPort());
         return Command.CONTINUE;
     }
 
@@ -566,7 +557,7 @@ public class LearningSwitch
     public void init(FloodlightModuleContext context)
             throws FloodlightModuleException {
         macVlanToSwitchPortMap =
-                new ConcurrentHashMap<IOFSwitch, Map<MacVlanPair,Short>>();
+                new ConcurrentHashMap<IOFSwitch, Map<MacVlanPair,Integer>>();
         floodlightProvider =
                 context.getServiceImpl(IFloodlightProviderService.class);
         counterStore =

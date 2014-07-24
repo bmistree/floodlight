@@ -10,6 +10,9 @@ import net.floodlightcontroller.util.MACAddress;
 import org.openflow.protocol.OFFeaturesReply;
 import org.openflow.protocol.OFPhysicalPort;
 import org.openflow.protocol.OFPhysicalPort.OFPortState;
+import org.openflow.protocol.OFPhysicalPort.OFPortConfig;
+import org.openflow.protocol.OFPhysicalPort.OFPortFeatures;
+import org.openflow.protocol.statistics.OFPortDescription;
 import org.openflow.protocol.statistics.OFDescriptionStatistics;
 import org.openflow.util.HexString;
 
@@ -27,7 +30,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class SwitchSyncRepresentation {
     public static class SyncedPort {
         @JsonProperty
-        public short portNumber;
+        public int portNumber;
         @JsonProperty
         public long hardwareAddress;
         @JsonProperty
@@ -55,16 +58,16 @@ public class SwitchSyncRepresentation {
                         MACAddress.valueOf(p.getHardwareAddress()).toLong();
             }
             rv.name = p.getName();
-            rv.config = EnumBitmaps.toBitmap(p.getConfig());
-            rv.state = p.getStpState().getValue();
+            rv.config = OFPortConfig.toBitmap(p.getConfig());
+            rv.state = p.getPortState().getValue();
             if (p.isLinkDown())
                 rv.state |= OFPortState.OFPPS_LINK_DOWN.getValue();
-            rv.currentFeatures  = EnumBitmaps.toBitmap(p.getCurrentFeatures());
+            rv.currentFeatures  = OFPortFeatures.toBitmap(p.getCurrentFeatures());
             rv.advertisedFeatures =
-                    EnumBitmaps.toBitmap(p.getAdvertisedFeatures());
+            		OFPortFeatures.toBitmap(p.getAdvertisedFeatures());
             rv.supportedFeatures =
-                    EnumBitmaps.toBitmap(p.getSupportedFeatures());
-            rv.peerFeatures = EnumBitmaps.toBitmap(p.getPeerFeatures());
+            		OFPortFeatures.toBitmap(p.getSupportedFeatures());
+            rv.peerFeatures = OFPortFeatures.toBitmap(p.getPeerFeatures());
             return rv;
         }
 
@@ -156,14 +159,14 @@ public class SwitchSyncRepresentation {
     }
 
     public SwitchSyncRepresentation(OFFeaturesReply fr,
-                                    OFDescriptionStatistics d) {
+                                    OFDescriptionStatistics d, List<OFPortDescription> pdl) {
         this.dpid = fr.getDatapathId();
         this.buffers = fr.getBuffers();
         this.tables = fr.getTables();
         this.capabilities = fr.getCapabilities();
         this.actions = fr.getActions();
         this.ports = toSyncedPortList(
-                ImmutablePort.immutablePortListOf(fr.getPorts()));
+                ImmutablePort.immutablePortListOf(pdl));
 
         this.manufacturerDescription = d.getManufacturerDescription();
         this.hardwareDescription = d.getHardwareDescription();
@@ -186,7 +189,6 @@ public class SwitchSyncRepresentation {
             rv.add(p.toOFPhysicalPort());
         }
         return rv;
-
     }
 
     @JsonIgnore
@@ -197,7 +199,6 @@ public class SwitchSyncRepresentation {
         fr.setTables(tables);
         fr.setCapabilities(capabilities);
         fr.setActions(actions);
-        fr.setPorts(toOFPhysicalPortList(ports));
         return fr;
     }
 
@@ -212,7 +213,11 @@ public class SwitchSyncRepresentation {
         return desc;
     }
 
-
+    //TODO: getPortDescriptions
+    @JsonIgnore
+    public List<OFPortDescription> getPortDescriptions() {
+        return null;
+    }
 
     public long getDpid() {
         return dpid;

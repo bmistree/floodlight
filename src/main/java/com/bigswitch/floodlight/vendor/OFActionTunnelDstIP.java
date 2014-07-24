@@ -3,7 +3,7 @@ package com.bigswitch.floodlight.vendor;
 import net.floodlightcontroller.core.web.serializers.IPv4Serializer;
 import net.floodlightcontroller.packet.IPv4;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
@@ -33,15 +33,15 @@ public class OFActionTunnelDstIP extends OFActionBigSwitchVendor {
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        this.dstIPAddr = data.readInt();
+        this.dstIPAddr = data.getInt();
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeInt(this.dstIPAddr);
+        data.putInt(this.dstIPAddr);
     }
 
     @Override

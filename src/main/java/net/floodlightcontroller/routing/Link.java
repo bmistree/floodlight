@@ -24,26 +24,18 @@ public class Link implements Comparable<Link> {
     @JsonProperty("src-switch")
     private long src;
     @JsonProperty("src-port")
-    private short srcPort;
+    private int srcPort;
     @JsonProperty("dst-switch")
     private long dst;
     @JsonProperty("dst-port")
-    private short dstPort;
+    private int dstPort;
 
 
-    public Link(long srcId, short srcPort, long dstId, short dstPort) {
+    public Link(long srcId, int srcPort, long dstId, int dstPort) {
         this.src = srcId;
         this.srcPort = srcPort;
         this.dst = dstId;
         this.dstPort = dstPort;
-    }
-
-    // Convenience method
-    public Link(long srcId, int srcPort, long dstId, int dstPort) {
-        this.src = srcId;
-        this.srcPort = (short) srcPort;
-        this.dst = dstId;
-        this.dstPort = (short) dstPort;
     }
 
     /*
@@ -58,7 +50,7 @@ public class Link implements Comparable<Link> {
         return src;
     }
 
-    public short getSrcPort() {
+    public int getSrcPort() {
         return srcPort;
     }
 
@@ -66,7 +58,7 @@ public class Link implements Comparable<Link> {
         return dst;
     }
 
-    public short getDstPort() {
+    public int getDstPort() {
         return dstPort;
     }
 

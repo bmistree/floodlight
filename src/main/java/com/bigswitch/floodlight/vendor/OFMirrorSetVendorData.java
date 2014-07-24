@@ -1,6 +1,6 @@
 package com.bigswitch.floodlight.vendor;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 
 public class OFMirrorSetVendorData extends OFBigSwitchVendorData {
     
@@ -40,23 +40,23 @@ public class OFMirrorSetVendorData extends OFBigSwitchVendorData {
      * @param data: the channel buffer from which we are deserializing
      * @param length: the length to the end of the enclosing message
      */
-    public void readFrom(ChannelBuffer data, int length) {
+    public void readFrom(ByteBuffer data, int length) {
         super.readFrom(data, length);
-        reportMirrorPorts = data.readByte();
-        pad1 = data.readByte();
-        pad2 = data.readByte();
-        pad3 = data.readByte();
+        reportMirrorPorts = data.get();
+        pad1 = data.get();
+        pad2 = data.get();
+        pad3 = data.get();
     }
     
     /**
      * Write the vendor data to the channel buffer
      */
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeByte(reportMirrorPorts);
-        data.writeByte(pad1);
-        data.writeByte(pad2);
-        data.writeByte(pad3);
+        data.put(reportMirrorPorts);
+        data.put(pad1);
+        data.put(pad2);
+        data.put(pad3);
     }
     
 }

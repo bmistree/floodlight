@@ -26,11 +26,12 @@ import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.packet.UDP;
 import net.floodlightcontroller.util.MACAddress;
 
+import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFPacketIn;
 import org.openflow.protocol.OFPacketOut;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.OFPacketIn.OFPacketInReason;
-import org.openflow.protocol.factory.BasicFactory;
+import org.openflow.protocol.factory.FloodlightFactory;
 
 /**
  * A class to that creates many types of L2/L3/L4 or OpenFlow packets.
@@ -41,7 +42,7 @@ import org.openflow.protocol.factory.BasicFactory;
 public class PacketFactory {
     public static String broadcastMac = "ff:ff:ff:ff:ff:ff";
     public static String broadcastIp = "255.255.255.255";
-    protected static BasicFactory OFMessageFactory = BasicFactory.getInstance();
+    protected static FloodlightFactory OFMessageFactory = FloodlightFactory.getInstance();
     
     /**
      * Generates a DHCP request OFPacketIn.
@@ -53,7 +54,7 @@ public class PacketFactory {
         return (((OFPacketIn)OFMessageFactory
                 .getMessage(OFType.PACKET_IN))
                 .setBufferId(OFPacketOut.BUFFER_ID_NONE)
-                .setInPort((short) 1)
+                .setMatch(new OFMatch().setInPort(1))
                 .setPacketData(serializedPacket)
                 .setReason(OFPacketInReason.NO_MATCH)
                 .setTotalLength((short)serializedPacket.length));

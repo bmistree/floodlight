@@ -19,8 +19,8 @@ package org.openflow.vendor.openflow;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.openflow.protocol.OFPacketQueue;
+import java.nio.ByteBuffer;
+import org.openflow.protocol.queue.OFPacketQueue;
 
 /**
  * Class that represents the vendor data in a queue modify or delete request
@@ -30,7 +30,7 @@ import org.openflow.protocol.OFPacketQueue;
 public class OFQueueVendorData extends OFOpenFlowVendorData {
     public static int MINIMUM_LENGTH = 8;
 
-    protected short portNumber;
+    protected int portNumber;
     protected List<OFPacketQueue> queues = new ArrayList<OFPacketQueue>();
 
     public OFQueueVendorData(int dataType) {
@@ -40,14 +40,14 @@ public class OFQueueVendorData extends OFOpenFlowVendorData {
     /**
      * @return the portNumber
      */
-    public short getPortNumber() {
+    public int getPortNumber() {
         return portNumber;
     }
 
     /**
      * @param port the port on which the queue is
      */
-    public void setPortNumber(short portNumber) {
+    public void setPortNumber(int portNumber) {
         this.portNumber = portNumber;
     }
 
@@ -81,15 +81,14 @@ public class OFQueueVendorData extends OFOpenFlowVendorData {
     }
 
     /**
-     * Read the queue message data from the ChannelBuffer
+     * Read the queue message data from the ByteBuffer
      * @param data the channel buffer from which we're deserializing
      * @param length the length to the end of the enclosing message
      */
-    public void readFrom(ChannelBuffer data, int length) {
+    public void readFrom(ByteBuffer data, int length) {
         super.readFrom(data, length);
-        portNumber = data.readShort();
-        data.readInt();   // pad
-        data.readShort(); // pad
+        portNumber = data.getInt();
+        data.getInt();   // pad
 
         int availLength = (length - MINIMUM_LENGTH);
         this.queues.clear();
@@ -103,14 +102,13 @@ public class OFQueueVendorData extends OFOpenFlowVendorData {
     }
 
     /**
-     * Write the queue message data to the ChannelBuffer
+     * Write the queue message data to the ByteBuffer
      * @param data the channel buffer to which we're serializing
      */
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeShort(this.portNumber);
-        data.writeInt(0);   // pad
-        data.writeShort(0); // pad
+        data.putInt(this.portNumber);
+        data.putInt(0);   // pad
 
         for (OFPacketQueue queue : queues) {
             queue.writeTo(data);

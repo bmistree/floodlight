@@ -361,12 +361,12 @@ IFlowReconcileListener, IInfoProvider {
             //First compare based on L2 domain ID;
 
             long oldSw = oldAP.getSw();
-            short oldPort = oldAP.getPort();
+            int oldPort = oldAP.getPort();
             long oldDomain = topology.getL2DomainId(oldSw);
             boolean oldBD = topology.isBroadcastDomainPort(oldSw, oldPort);
 
             long newSw = newAP.getSw();
-            short newPort = newAP.getPort();
+            int newPort = newAP.getPort();
             long newDomain = topology.getL2DomainId(newSw);
             boolean newBD = topology.isBroadcastDomainPort(newSw, newPort);
 
@@ -642,12 +642,12 @@ IFlowReconcileListener, IInfoProvider {
     }
 
     @Override
-    public void addSuppressAPs(long swId, short port) {
+    public void addSuppressAPs(long swId, int port) {
         suppressAPs.add(new SwitchPort(swId, port));
     }
 
     @Override
-    public void removeSuppressAPs(long swId, short port) {
+    public void removeSuppressAPs(long swId, int port) {
         suppressAPs.remove(new SwitchPort(swId, port));
     }
 
@@ -1428,11 +1428,11 @@ IFlowReconcileListener, IInfoProvider {
             return null;
 
         Long swDpid = null;
-        Short inPort = null;
+        Integer inPort = null;
 
         if (isSource) {
             swDpid = ofmWithSwDpid.getSwitchDataPathId();
-            inPort = ofmWithSwDpid.getOfMatch().getInputPort();
+            inPort = ofmWithSwDpid.getOfMatch().getInPort();
         }
 
         /**for the new flow cache design, the flow mods retrived are not always
@@ -1450,7 +1450,7 @@ IFlowReconcileListener, IInfoProvider {
             // as a key field.
             learnap = false;
         }
-        */
+        */ 
 
         short vlan = ofmWithSwDpid.getOfMatch().getDataLayerVirtualLan();
         return new Entity(dlAddr,

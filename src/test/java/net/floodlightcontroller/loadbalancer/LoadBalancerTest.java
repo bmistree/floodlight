@@ -499,7 +499,7 @@ public class LoadBalancerTest extends FloodlightTestCase {
              ((OFPacketIn) getMockFloodlightProvider().getOFMessageFactory().
                      getMessage(OFType.PACKET_IN))
                      .setBufferId(-1)
-                     .setInPort((short) 1)
+                     .setMatch(new OFMatch().setInPort(1))
                      .setPacketData(arpRequest1Serialized)
                      .setReason(OFPacketInReason.NO_MATCH)
                      .setTotalLength((short) arpRequest1Serialized.length);
@@ -533,7 +533,7 @@ public class LoadBalancerTest extends FloodlightTestCase {
              (OFPacketOut) getMockFloodlightProvider().getOFMessageFactory().
                  getMessage(OFType.PACKET_OUT);
      arpReplyPacketOut1.setBufferId(OFPacketOut.BUFFER_ID_NONE)
-         .setInPort(OFPort.OFPP_NONE.getValue());
+         .setMatch(new OFMatch().setInPort(OFPort.OFPP_ANY.getValue()));
      List<OFAction> poactions = new ArrayList<OFAction>();
      poactions.add(new OFActionOutput(arpRequestPacketIn1.getInPort(), (short) 0xffff));
      arpReplyPacketOut1.setActions(poactions)
@@ -584,7 +584,7 @@ public class LoadBalancerTest extends FloodlightTestCase {
              ((OFPacketIn) getMockFloodlightProvider().getOFMessageFactory().
                      getMessage(OFType.PACKET_IN))
                      .setBufferId(-1)
-                     .setInPort((short) 1)
+                     .setMatch(new OFMatch().setInPort(1))
                      .setPacketData(icmpPacket1Serialized)
                      .setReason(OFPacketInReason.NO_MATCH)
                      .setTotalLength((short) icmpPacket1Serialized.length);
@@ -610,7 +610,7 @@ public class LoadBalancerTest extends FloodlightTestCase {
              ((OFPacketIn) getMockFloodlightProvider().getOFMessageFactory().
                      getMessage(OFType.PACKET_IN))
                      .setBufferId(-1)
-                     .setInPort((short) 2)
+                     .setMatch(new OFMatch().setInPort(2))
                      .setPacketData(icmpPacket2Serialized)
                      .setReason(OFPacketInReason.NO_MATCH)
                      .setTotalLength((short) icmpPacket2Serialized.length);

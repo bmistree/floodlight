@@ -1,34 +1,34 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol.statistics;
 
+import java.nio.ByteBuffer;
 
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.protocol.OFMatch;
+import org.openflow.protocol.OFPort;
+import org.openflow.protocol.OFGroup;
+import org.openflow.protocol.OFTable;
 
 /**
  * Represents an ofp_flow_stats_request structure
  * @author David Erickson (daviderickson@cs.stanford.edu)
+ * @author Srini Seetharaman (srini.seetharaman@gmail.com)
  */
 public class OFFlowStatisticsRequest implements OFStatistics {
+    public final static int MINIMUM_LENGTH = 40;
+
     protected OFMatch match;
     protected byte tableId;
-    protected short outPort;
+    protected int outPort;
+    protected int outGroup;
+    protected long cookie;
+    protected long cookieMask;
+
+    public OFFlowStatisticsRequest() {
+        super();
+        this.outPort = OFPort.OFPP_ANY.getValue();
+        this.outGroup = OFGroup.OFPG_ANY.getValue();
+        this.tableId = OFTable.OFPTT_ALL;
+        this.cookieMask = 0;
+    }
 
     /**
      * @return the match
@@ -40,8 +40,9 @@ public class OFFlowStatisticsRequest implements OFStatistics {
     /**
      * @param match the match to set
      */
-    public void setMatch(OFMatch match) {
+    public OFFlowStatisticsRequest setMatch(OFMatch match) {
         this.match = match;
+        return this;
     }
 
     /**
@@ -54,54 +55,121 @@ public class OFFlowStatisticsRequest implements OFStatistics {
     /**
      * @param tableId the tableId to set
      */
-    public void setTableId(byte tableId) {
+    public OFFlowStatisticsRequest setTableId(byte tableId) {
         this.tableId = tableId;
+        return this;
     }
 
     /**
      * @return the outPort
      */
-    public short getOutPort() {
+    public int getOutPort() {
         return outPort;
     }
 
     /**
      * @param outPort the outPort to set
      */
-    public void setOutPort(short outPort) {
+    public OFFlowStatisticsRequest setOutPort(int outPort) {
         this.outPort = outPort;
+        return this;
+    }
+
+    /**
+     * @return the outGroup
+     */
+    public int getOutGroup() {
+        return outGroup;
+    }
+
+    /**
+     * @param outGroup the outGroup to set
+     */
+    public OFFlowStatisticsRequest setOutGroup(int outGroup) {
+        this.outGroup = outGroup;
+        return this;
+    }
+
+    /**
+     * Get cookie
+     * @return
+     */
+    public long getCookie() {
+        return this.cookie;
+    }
+
+    /**
+     * Set cookie
+     * @param cookie
+     */
+    public OFFlowStatisticsRequest setCookie(long cookie) {
+        this.cookie = cookie;
+        return this;
+    }
+
+    /**
+     * Get cookieMask
+     * @return
+     */
+    public long getCookieMask() {
+        return this.cookieMask;
+    }
+
+    /**
+     * Set cookieMask
+     * @param cookieMask
+     */
+    public OFFlowStatisticsRequest setCookieMask(long cookieMask) {
+        this.cookieMask = cookieMask;
+        return this;
     }
 
     @Override
     public int getLength() {
-        return 44;
+        int l = MINIMUM_LENGTH;
+        if (match != null) 
+           l += match.getLength() - OFMatch.MINIMUM_LENGTH;
+        return l;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
+        this.tableId = data.get();
+        data.get(); // pad
+        data.getShort(); // pad
+        this.outPort = data.getInt();
+        this.outGroup = data.getInt();
+        data.getInt(); //pad
+        this.cookie = data.getLong();
+        this.cookieMask = data.getLong();
         if (this.match == null)
             this.match = new OFMatch();
         this.match.readFrom(data);
-        this.tableId = data.readByte();
-        data.readByte(); // pad
-        this.outPort = data.readShort();
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
+        data.put(this.tableId);
+        data.put((byte) 0); //pad
+        data.putShort((short) 0); //pad
+        data.putInt(this.outPort);
+        data.putInt(this.outGroup);
+        data.putInt(0);
+        data.putLong(cookie);
+        data.putLong(cookieMask);
         this.match.writeTo(data);
-        data.writeByte(this.tableId);
-        data.writeByte((byte) 0);
-        data.writeShort(this.outPort);
     }
 
     @Override
     public int hashCode() {
-        final int prime = 421;
+        final int prime = 401;
         int result = 1;
         result = prime * result + ((match == null) ? 0 : match.hashCode());
         result = prime * result + outPort;
+        result = prime * result + outGroup;
         result = prime * result + tableId;
+        result = prime * result + (int) (cookie ^ (cookie >>> 32));
+        result = prime * result + (int) (cookieMask ^ (cookieMask >>> 32));
         return result;
     }
 
@@ -127,9 +195,23 @@ public class OFFlowStatisticsRequest implements OFStatistics {
         if (outPort != other.outPort) {
             return false;
         }
+        if (outGroup != other.outGroup) {
+            return false;
+        }
         if (tableId != other.tableId) {
             return false;
         }
+        if (cookie != other.cookie) {
+            return false;
+        }
+        if (cookieMask != other.cookieMask) {
+            return false;
+        }
         return true;
+    }
+
+    @Override
+    public int computeLength() {
+        return getLength();
     }
 }

@@ -16,7 +16,7 @@
 
 package org.openflow.protocol.factory;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 import org.openflow.protocol.action.OFActionVendor;
 
 /** Interface contract for an actionfactory that creates vendor-specific actions.
@@ -39,5 +39,5 @@ public interface OFVendorActionFactory {
      *   entire length. Upon failure, returns null and leaves the readerPosition
      *   in data unmodified.
      */
-    OFActionVendor readFrom(ChannelBuffer data);
+    OFActionVendor readFrom(ByteBuffer data);
 }

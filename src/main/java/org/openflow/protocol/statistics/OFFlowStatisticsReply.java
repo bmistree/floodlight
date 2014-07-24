@@ -1,52 +1,36 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol.statistics;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.protocol.OFMatch;
-import org.openflow.protocol.action.OFAction;
-import org.openflow.protocol.factory.OFActionFactory;
-import org.openflow.protocol.factory.OFActionFactoryAware;
+import org.openflow.protocol.instruction.OFInstruction;
+import org.openflow.protocol.factory.OFInstructionFactory;
+import org.openflow.protocol.factory.OFInstructionFactoryAware;
 import org.openflow.util.U16;
 
 /**
  * Represents an ofp_flow_stats structure
  * @author David Erickson (daviderickson@cs.stanford.edu)
+ * @author Srini Seetharaman (srini.seetharaman@gmail.com)
  */
-public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware {
-    public static int MINIMUM_LENGTH = 88;
+public class OFFlowStatisticsReply implements OFStatistics, OFInstructionFactoryAware {
+    public static int MINIMUM_LENGTH = 56;
 
-    protected OFActionFactory actionFactory;
+    protected OFInstructionFactory instructionFactory;
     protected short length = (short) MINIMUM_LENGTH;
     protected byte tableId;
-    protected OFMatch match;
     protected int durationSeconds;
     protected int durationNanoseconds;
     protected short priority;
     protected short idleTimeout;
     protected short hardTimeout;
+    protected short flags;
     protected long cookie;
     protected long packetCount;
     protected long byteCount;
-    protected List<OFAction> actions;
+    protected OFMatch match;
+    protected List<OFInstruction> instructions;
 
     /**
      * @return the tableId
@@ -58,8 +42,9 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
     /**
      * @param tableId the tableId to set
      */
-    public void setTableId(byte tableId) {
+    public OFFlowStatisticsReply setTableId(byte tableId) {
         this.tableId = tableId;
+        return this;
     }
 
     /**
@@ -72,8 +57,10 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
     /**
      * @param match the match to set
      */
-    public void setMatch(OFMatch match) {
+    public OFFlowStatisticsReply setMatch(OFMatch match) {
         this.match = match;
+        updateLength();
+        return this;
     }
 
     /**
@@ -86,8 +73,9 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
     /**
      * @param durationSeconds the durationSeconds to set
      */
-    public void setDurationSeconds(int durationSeconds) {
+    public OFFlowStatisticsReply setDurationSeconds(int durationSeconds) {
         this.durationSeconds = durationSeconds;
+        return this;
     }
 
     /**
@@ -100,8 +88,9 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
     /**
      * @param durationNanoseconds the durationNanoseconds to set
      */
-    public void setDurationNanoseconds(int durationNanoseconds) {
+    public OFFlowStatisticsReply setDurationNanoseconds(int durationNanoseconds) {
         this.durationNanoseconds = durationNanoseconds;
+        return this;
     }
 
     /**
@@ -114,8 +103,9 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
     /**
      * @param priority the priority to set
      */
-    public void setPriority(short priority) {
+    public OFFlowStatisticsReply setPriority(short priority) {
         this.priority = priority;
+        return this;
     }
 
     /**
@@ -128,8 +118,9 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
     /**
      * @param idleTimeout the idleTimeout to set
      */
-    public void setIdleTimeout(short idleTimeout) {
+    public OFFlowStatisticsReply setIdleTimeout(short idleTimeout) {
         this.idleTimeout = idleTimeout;
+        return this;
     }
 
     /**
@@ -142,8 +133,24 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
     /**
      * @param hardTimeout the hardTimeout to set
      */
-    public void setHardTimeout(short hardTimeout) {
+    public OFFlowStatisticsReply setHardTimeout(short hardTimeout) {
         this.hardTimeout = hardTimeout;
+        return this;
+    }
+
+    /**
+     * @return the flags
+     */
+    public short getFlags() {
+        return flags;
+    }
+
+    /**
+     * @param flags the flags to set
+     */
+    public OFFlowStatisticsReply setFlags(short flags) {
+        this.flags = flags;
+        return this;
     }
 
     /**
@@ -156,8 +163,9 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
     /**
      * @param cookie the cookie to set
      */
-    public void setCookie(long cookie) {
+    public OFFlowStatisticsReply setCookie(long cookie) {
         this.cookie = cookie;
+        return this;
     }
 
     /**
@@ -170,8 +178,9 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
     /**
      * @param packetCount the packetCount to set
      */
-    public void setPacketCount(long packetCount) {
+    public OFFlowStatisticsReply setPacketCount(long packetCount) {
         this.packetCount = packetCount;
+        return this;
     }
 
     /**
@@ -184,8 +193,9 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
     /**
      * @param byteCount the byteCount to set
      */
-    public void setByteCount(long byteCount) {
+    public OFFlowStatisticsReply setByteCount(long byteCount) {
         this.byteCount = byteCount;
+        return this;
     }
 
     /**
@@ -196,97 +206,81 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
     }
 
     @Override
-    @JsonIgnore
     public int getLength() {
         return U16.f(length);
     }
 
     /**
-     * @param actionFactory the actionFactory to set
+     * @param instructionFactory the instructionFactory to set
      */
     @Override
-    public void setActionFactory(OFActionFactory actionFactory) {
-        this.actionFactory = actionFactory;
+    public void setInstructionFactory(OFInstructionFactory instructionFactory) {
+        this.instructionFactory = instructionFactory;
     }
 
     /**
-     * @return the actions
+     * @return the instructions
      */
-    public List<OFAction> getActions() {
-        return actions;
+    public List<OFInstruction> getInstructions() {
+        return instructions;
     }
 
     /**
-     * @param actions the actions to set
+     * @param instructions the instructions to set
      */
-    public void setActions(List<OFAction> actions) {
-        this.actions = actions;
+    public OFFlowStatisticsReply setInstructions(List<OFInstruction> instructions) {
+        this.instructions = instructions;
+        updateLength();
+        return this;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
-        this.length = data.readShort();
-        this.tableId = data.readByte();
-        data.readByte(); // pad
+    public void readFrom(ByteBuffer data) {
+        this.length = data.getShort();
+        this.tableId = data.get();
+        data.get(); // pad
+        this.durationSeconds = data.getInt();
+        this.durationNanoseconds = data.getInt();
+        this.priority = data.getShort();
+        this.idleTimeout = data.getShort();
+        this.hardTimeout = data.getShort();
+        this.flags = data.getShort();
+        data.getInt(); // pad
+        this.cookie = data.getLong();
+        this.packetCount = data.getLong();
+        this.byteCount = data.getLong();
         if (this.match == null)
             this.match = new OFMatch();
         this.match.readFrom(data);
-        this.durationSeconds = data.readInt();
-        this.durationNanoseconds = data.readInt();
-        this.priority = data.readShort();
-        this.idleTimeout = data.readShort();
-        this.hardTimeout = data.readShort();
-        data.readInt(); // pad
-        data.readShort(); // pad
-        this.cookie = data.readLong();
-        this.packetCount = data.readLong();
-        this.byteCount = data.readLong();
-        if (this.actionFactory == null)
-            throw new RuntimeException("OFActionFactory not set");
-        this.actions = this.actionFactory.parseActions(data, getLength() -
-                MINIMUM_LENGTH);
+        if (this.instructionFactory == null)
+            throw new RuntimeException("OFInstructionFactory not set");
+        this.instructions = this.instructionFactory.parseInstructions(data, getLength() -
+                MINIMUM_LENGTH + OFMatch.MINIMUM_LENGTH - match.getLength());
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
-        data.writeShort(this.length);
-        data.writeByte(this.tableId);
-        data.writeByte((byte) 0);
+    public void writeTo(ByteBuffer data) {
+        data.putShort(this.length);
+        data.put(this.tableId);
+        data.put((byte) 0); //pad
+        data.putInt(this.durationSeconds);
+        data.putInt(this.durationNanoseconds);
+        data.putShort(this.priority);
+        data.putShort(this.idleTimeout);
+        data.putShort(this.hardTimeout);
+        data.putShort(this.flags);
+        data.putInt(0); // pad
+        data.putLong(this.cookie);
+        data.putLong(this.packetCount);
+        data.putLong(this.byteCount);
         this.match.writeTo(data);
-        data.writeInt(this.durationSeconds);
-        data.writeInt(this.durationNanoseconds);
-        data.writeShort(this.priority);
-        data.writeShort(this.idleTimeout);
-        data.writeShort(this.hardTimeout);
-        data.writeInt(0); // pad
-        data.writeShort((short)0); // pad
-        data.writeLong(this.cookie);
-        data.writeLong(this.packetCount);
-        data.writeLong(this.byteCount);
-        if (actions != null) {
-            for (OFAction action : actions) {
-                action.writeTo(data);
+        if (instructions != null) {
+            for (OFInstruction instruction : instructions) {
+                instruction.writeTo(data);
             }
         }
     }
 
-    @Override
-    public String toString() {
-    	String str = "match=" + this.match;
-    	str += " tableId=" + this.tableId;
-    	str += " durationSeconds=" + this.durationSeconds;
-    	str += " durationNanoseconds=" + this.durationNanoseconds;
-    	str += " priority=" + this.priority;
-    	str += " idleTimeout=" + this.idleTimeout;
-    	str += " hardTimeout=" + this.hardTimeout;
-        str += " cookie=" + Long.toHexString(this.cookie);
-    	str += " packetCount=" + this.packetCount;
-    	str += " byteCount=" + this.byteCount;
-    	str += " action=" + this.actions;
-    	
-    	return str;
-    }
-    
     @Override
     public int hashCode() {
         final int prime = 419;
@@ -297,6 +291,7 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
         result = prime * result + durationSeconds;
         result = prime * result + hardTimeout;
         result = prime * result + idleTimeout;
+        result = prime * result + flags;
         result = prime * result + length;
         result = prime * result + ((match == null) ? 0 : match.hashCode());
         result = prime * result + (int) (packetCount ^ (packetCount >>> 32));
@@ -335,6 +330,9 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
         if (idleTimeout != other.idleTimeout) {
             return false;
         }
+        if (flags != other.flags) {
+            return false;
+        }
         if (length != other.length) {
             return false;
         }
@@ -355,5 +353,36 @@ public class OFFlowStatisticsReply implements OFStatistics, OFActionFactoryAware
             return false;
         }
         return true;
+    }
+
+    public void updateLength() {
+        int l = MINIMUM_LENGTH - OFMatch.MINIMUM_LENGTH;
+        if (instructions != null) {
+            for (OFInstruction instruction : instructions) {
+                l += instruction.getLengthU();
+            }
+        }
+        l += match.getLength();
+        this.length = U16.t(l);
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "OFFlowStatisticsReply [instructionFactory=" + instructionFactory
+                + ", length=" + length + ", tableId=" + tableId + ", match="
+                + match + ", durationSeconds=" + durationSeconds
+                + ", durationNanoseconds=" + durationNanoseconds
+                + ", priority=" + priority + ", idleTimeout=" + idleTimeout
+                + ", hardTimeout=" + hardTimeout + ", flags=" + flags + ", cookie=" + cookie
+                + ", packetCount=" + packetCount + ", byteCount=" + byteCount
+                + ", instructions=" + instructions + "]";
+    }
+
+    @Override
+    public int computeLength() {
+        return getLength();
     }
 }

@@ -25,13 +25,13 @@ public class FlowReconcileQueryPortDown extends FlowReconcileQuery {
     /*down port switch DPID*/
     public long swId;
     /*down port ID */
-    public short port;
+    public int port;
 
     public FlowReconcileQueryPortDown() {
         super(ReconcileQueryEvType.LINK_DOWN);
     }
 
-    public FlowReconcileQueryPortDown(long swId, short portDown) {
+    public FlowReconcileQueryPortDown(long swId, int portDown) {
         this();
         this.swId = swId;
         this.port = portDown;

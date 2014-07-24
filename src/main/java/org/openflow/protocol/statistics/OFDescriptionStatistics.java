@@ -1,27 +1,8 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-*
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol.statistics;
 
+import java.nio.ByteBuffer;
 
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.util.StringByteSerializer;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
  * Represents an ofp_desc_stats structure
@@ -30,13 +11,13 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 public class OFDescriptionStatistics implements OFStatistics {
     public static int DESCRIPTION_STRING_LENGTH = 256;
     public static int SERIAL_NUMBER_LENGTH = 32;
+    public static int MINIMUM_LENGTH = 1056;
 
     protected String manufacturerDescription;
     protected String hardwareDescription;
     protected String softwareDescription;
     protected String serialNumber;
     protected String datapathDescription;
-
 
     /**
      *
@@ -47,14 +28,14 @@ public class OFDescriptionStatistics implements OFStatistics {
     /**
      * Copy constructor
      */
-    public OFDescriptionStatistics(OFDescriptionStatistics other) {
-        manufacturerDescription = other.manufacturerDescription;
-        hardwareDescription = other.hardwareDescription;
-        softwareDescription = other.softwareDescription;
-        serialNumber = other.serialNumber;
-        datapathDescription = other.datapathDescription;
+	public OFDescriptionStatistics(OFDescriptionStatistics other) {
+    	manufacturerDescription = other.manufacturerDescription;
+       	hardwareDescription = other.hardwareDescription;
+       	softwareDescription = other.softwareDescription;
+       	serialNumber = other.serialNumber;
+    	datapathDescription = other.datapathDescription;
     }
-
+    
     /**
      * @return the manufacturerDescription
      */
@@ -65,8 +46,9 @@ public class OFDescriptionStatistics implements OFStatistics {
     /**
      * @param manufacturerDescription the manufacturerDescription to set
      */
-    public void setManufacturerDescription(String manufacturerDescription) {
+    public OFDescriptionStatistics setManufacturerDescription(String manufacturerDescription) {
         this.manufacturerDescription = manufacturerDescription;
+        return this;
     }
 
     /**
@@ -79,8 +61,9 @@ public class OFDescriptionStatistics implements OFStatistics {
     /**
      * @param hardwareDescription the hardwareDescription to set
      */
-    public void setHardwareDescription(String hardwareDescription) {
+    public OFDescriptionStatistics setHardwareDescription(String hardwareDescription) {
         this.hardwareDescription = hardwareDescription;
+        return this;
     }
 
     /**
@@ -93,8 +76,9 @@ public class OFDescriptionStatistics implements OFStatistics {
     /**
      * @param softwareDescription the softwareDescription to set
      */
-    public void setSoftwareDescription(String softwareDescription) {
+    public OFDescriptionStatistics setSoftwareDescription(String softwareDescription) {
         this.softwareDescription = softwareDescription;
+        return this;
     }
 
     /**
@@ -107,8 +91,9 @@ public class OFDescriptionStatistics implements OFStatistics {
     /**
      * @param serialNumber the serialNumber to set
      */
-    public void setSerialNumber(String serialNumber) {
+    public OFDescriptionStatistics setSerialNumber(String serialNumber) {
         this.serialNumber = serialNumber;
+        return this;
     }
 
     /**
@@ -121,18 +106,18 @@ public class OFDescriptionStatistics implements OFStatistics {
     /**
      * @param datapathDescription the datapathDescription to set
      */
-    public void setDatapathDescription(String datapathDescription) {
+    public OFDescriptionStatistics setDatapathDescription(String datapathDescription) {
         this.datapathDescription = datapathDescription;
+        return this;
     }
 
     @Override
-    @JsonIgnore
     public int getLength() {
-        return 1056;
+        return MINIMUM_LENGTH;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         this.manufacturerDescription = StringByteSerializer.readFrom(data,
                 DESCRIPTION_STRING_LENGTH);
         this.hardwareDescription = StringByteSerializer.readFrom(data,
@@ -146,7 +131,7 @@ public class OFDescriptionStatistics implements OFStatistics {
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         StringByteSerializer.writeTo(data, DESCRIPTION_STRING_LENGTH,
                 this.manufacturerDescription);
         StringByteSerializer.writeTo(data, DESCRIPTION_STRING_LENGTH,
@@ -237,10 +222,15 @@ public class OFDescriptionStatistics implements OFStatistics {
 
     @Override
     public String toString() {
-        return "Switch Desc - Vendor: " +  manufacturerDescription +
-                "  Model: " + hardwareDescription +
-                "  Make: " + datapathDescription +
-                "  Version: " + softwareDescription +
-                "  S/N: " + serialNumber;
+        return "OFDescriptionStatistics [Vendor: " + manufacturerDescription
+                + ", Model: " + hardwareDescription
+                + ", Make: " + datapathDescription
+                + ", Version: " + softwareDescription 
+                + ", S/N: " + serialNumber + "]";
+    }
+
+    @Override
+    public int computeLength() {
+        return getLength();
     }
 }

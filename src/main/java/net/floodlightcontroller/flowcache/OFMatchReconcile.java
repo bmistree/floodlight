@@ -66,7 +66,7 @@ public class OFMatchReconcile  {
     /** The reconcile action. */
     public ReconcileAction rcAction;
     /** Outport in the event of UPDATE_PATH action**/
-    public short outPort;
+    public int outPort;
 
     // The context for the reconcile action
     public FloodlightContext cntx;

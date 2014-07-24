@@ -33,13 +33,21 @@ enum OFMessageType {
   PORT_STATUS = 12,
   PACKET_OUT = 13,
   FLOW_MOD = 14,
-  PORT_MOD = 15,
-  STATS_REQUEST = 16,
-  STATS_REPLY = 17,
-  BARRIER_REQUEST = 18,
-  BARRIER_REPLY = 19,
-  QUEUE_GET_CONFIG_REQUEST = 20,
-  QUEUE_GET_CONFIG_REPLY = 21,
+  GROUP_MOD = 15,
+  PORT_MOD = 16,
+  TABLE_MOD = 17,
+  MULTIPART_REQUEST = 18,
+  MULTIPART_REPLY = 19,
+  BARRIER_REQUEST = 20,
+  BARRIER_REPLY = 21,
+  QUEUE_GET_CONFIG_REQUEST = 22,
+  QUEUE_GET_CONFIG_REPLY = 23,
+  ROLE_REQUEST = 24,
+  ROLE_REPLY = 25,
+  GET_ASYNC_REQUEST = 26,
+  GET_ASYNC_REPLY = 27,
+  SET_ASYNC = 28,
+  METER_MOD = 29
 }
 
 /**
@@ -47,7 +55,7 @@ enum OFMessageType {
  */
 struct SwitchPortTuple {
   1: i64 dpid,
-  2: i16 port,
+  2: i32 port,
 }
 
 struct Packet {

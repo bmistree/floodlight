@@ -1,92 +1,31 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-*
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.Set;
+import java.util.Map;
 
-import net.floodlightcontroller.core.web.serializers.ByteArrayMACSerializer;
-import net.floodlightcontroller.core.web.serializers.UShortSerializer;
-import net.floodlightcontroller.util.EnumBitmaps;
-
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.util.HexString;
+import org.openflow.util.LRULinkedHashMap;
 
 /**
  * Represents ofp_phy_port
  * @author David Erickson (daviderickson@cs.stanford.edu) - Mar 25, 2010
+ * @author Srini Seetharaman (srini.seetharaman@gmail.com)
  */
 public class OFPhysicalPort {
-    public final static int MINIMUM_LENGTH = 48;
-    public final static int OFP_ETH_ALEN = 6;
+    public static int MINIMUM_LENGTH = 64;
+    public static int OFP_ETH_ALEN = 6;
+    public static int OFP_MAX_PORT_NAME_LEN = 16;
 
-    public enum OFPortConfig implements EnumBitmaps.BitmapableEnum {
-        OFPPC_PORT_DOWN    (1 << 0) {
-            @Override
-            public String toString() {
-                return "port-down (0x1)";
-            }
-        },
-        OFPPC_NO_STP       (1 << 1) {
-            @Override
-            public String toString() {
-                return "no-stp (0x2)";
-            }
-        },
-        OFPPC_NO_RECV      (1 << 2) {
-            @Override
-            public String toString() {
-                return "no-recv (0x4)";
-            }
-        },
-        OFPPC_NO_RECV_STP  (1 << 3) {
-            @Override
-            public String toString() {
-                return "no-recv-stp (0x8)";
-            }
-        },
-        OFPPC_NO_FLOOD     (1 << 4) {
-            @Override
-            public String toString() {
-                return "no-flood (0x10)";
-            }
-        },
-        OFPPC_NO_FWD       (1 << 5) {
-            @Override
-            public String toString() {
-                return "no-fwd (0x20)";
-            }
-        },
-        OFPPC_NO_PACKET_IN (1 << 6) {
-            @Override
-            public String toString() {
-                return "no-pkt-in (0x40)";
-            }
-        },
-        OFPPC_BSN_MIRROR_DEST (1 << 31) {
-            @Override
-            public String toString() {
-                return "bsn-mirror-dest (0x80000000)";
-            }
-        };
-
+    public enum OFPortConfig {
+        OFPPC_PORT_DOWN    (1 << 0),
+        OFPPC_NO_RECV      (1 << 2),
+        OFPPC_NO_FWD       (1 << 5),
+        OFPPC_NO_PACKET_IN (1 << 6);
 
         protected int value;
 
@@ -95,92 +34,189 @@ public class OFPhysicalPort {
         }
 
         /**
+         * Given a port config value, return the set of OFPortConfig enums
+         * associated with it
+         *
+         * @param i port config bitmap
+         * @return EnumSet<OFPortConfig>
+         */
+        public static EnumSet<OFPortConfig> valueOf(int i) {
+            EnumSet<OFPortConfig> configs = EnumSet.noneOf(OFPortConfig.class);
+            for (OFPortConfig value: OFPortConfig.values()) {
+                if ((i & value.getValue()) != 0)
+                    configs.add(value);
+            }
+            return configs;
+        }
+
+        /**
+         * Given a set of OFPortConfig enums, convert to bitmap value
+         *
+         * @param configs Set<OFPortConfig>
+         * @return bitmap value
+         */
+        public static int toBitmap(Set<OFPortConfig> configs) {
+            int bitmap = 0;
+            for (OFPortConfig config: configs) 
+                bitmap |= config.getValue();
+            return bitmap;
+        }
+
+        /**
          * @return the value
          */
-        @Override
         public int getValue() {
             return value;
         }
     }
 
     public enum OFPortState {
-        OFPPS_LINK_DOWN   (1 << 0, false) {
-            @Override
-            public String toString() {
-                return "link-down (0x1)";
-            }
-        },
-        OFPPS_STP_LISTEN  (0 << 8, true) {
-            @Override
-            public String toString() {
-                return "listen (0x0)";
-            }
-        },
-        OFPPS_STP_LEARN   (1 << 8, true) {
-            @Override
-            public String toString() {
-                return "learn-no-relay (0x100)";
-            }
-        },
-        OFPPS_STP_FORWARD (2 << 8, true) {
-            @Override
-            public String toString() {
-                return "forward (0x200)";
-            }
-        },
-        OFPPS_STP_BLOCK   (3 << 8, true) {
-            @Override
-            public String toString() {
-                return "block-broadcast (0x300)";
-            }
-        },
-        OFPPS_STP_MASK    (3 << 8, false) { // used for STP but not an STP state
-            @Override
-            public String toString() {
-                return "block-broadcast (0x300)";
-            }
-        };
+        OFPPS_LINK_DOWN   (1 << 0, "DOWN"),
+        OFPPS_BLOCKED     (1 << 1, "BLOCKED"),
+        OFPPS_LIVE        (1 << 2, "UP");
 
         protected int value;
-        protected boolean isStpState;
+        protected String name;
+        protected static Map<Integer, OFPortState> mapping;
+        private static final int MAX_ENTRIES = 10;
 
-        private OFPortState(int value, boolean isStpState) {
+        private OFPortState(int value, String name) {
+        	this.value = value;
+            this.name = name;
+
+            OFPortState.addMapping(this.value, this);
+            // To accommodate some vSwitches that report "0" for up
+            if (name.equals("UP"))
+                OFPortState.addMapping(0, this);
+        }
+
+        /**
+         * Adds a mapping from type value to OFPortState enum
+         *
+         * @param i state values
+         * @param t type
+         */
+        static public void addMapping(int i, OFPortState t) {
+            if (mapping == null)
+                mapping = new LRULinkedHashMap<Integer, OFPortState>(MAX_ENTRIES);
+
+            mapping.put(i, t);
+        }
+
+        /**
+         * Given a port state value, return the
+         * OFPortState associated with it
+         *
+         * @param i state value
+         * @return OFPortState enum type
+         */
+
+        public static OFPortState valueOf(int i) {
+            return mapping.get(i);
+        }
+        
+        /**
+         * @return the value
+         */
+        public int getValue() {
+            return value;
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+
+    /**
+     * Represents the speed of a port
+     */
+    public enum OFPortSpeed {
+        SPEED_NONE(0),
+        SPEED_10MB(10),
+        SPEED_100MB(100),
+        SPEED_1GB(1000),
+        SPEED_10GB(10000),
+        SPEED_40GB(40000),
+        SPEED_100GB(100000),
+        SPEED_1TB(1000000);
+
+        private int speedInMps;
+
+        private OFPortSpeed(int speedInMbps) {
+            this.speedInMps = speedInMbps;
+        }
+
+        public long getSpeedInMbps() {
+            return this.speedInMps;
+        }
+
+        public static OFPortSpeed max(OFPortSpeed s1, OFPortSpeed s2) {
+            return (s1.getSpeedInMbps() > s2.getSpeedInMbps()) ? s1 : s2;
+        }
+
+        public static OFPortSpeed min(OFPortSpeed s1, OFPortSpeed s2) {
+            return (s1.getSpeedInMbps() < s2.getSpeedInMbps()) ? s1 : s2;
+        }
+    }
+
+    public enum OFPortFeatures {
+        OFPPF_10MB_HD    (1 << 0, OFPortSpeed.SPEED_10MB, false, "10MB half-duplex"),
+        OFPPF_10MB_FD    (1 << 1, OFPortSpeed.SPEED_10MB, true, "10MB full-duplex"),
+        OFPPF_100MB_HD   (1 << 2, OFPortSpeed.SPEED_100MB, false, "100MB half-duplex"),
+        OFPPF_100MB_FD   (1 << 3, OFPortSpeed.SPEED_100MB, true, "100MB full-duplex"),
+        OFPPF_1GB_HD     (1 << 4, OFPortSpeed.SPEED_1GB, false, "1GB half-duplex"),
+        OFPPF_1GB_FD     (1 << 5, OFPortSpeed.SPEED_1GB, true, "1GB full-duplex"),
+        OFPPF_10GB_FD    (1 << 6, OFPortSpeed.SPEED_10GB, true, "10GB full-duplex"),
+        OFPPF_40GB_FD    (1 << 7, OFPortSpeed.SPEED_40GB, true, "40GB full-duplex"),
+        OFPPF_100GB_FD   (1 << 8, OFPortSpeed.SPEED_100GB, true, "100GB full-duplex"),
+        OFPPF_1TB_FD     (1 << 9, OFPortSpeed.SPEED_1TB, true, "1TB full-duplex"),
+        OFPPF_OTHER      (1 << 10, OFPortSpeed.SPEED_NONE, false, "Other"),
+        OFPPF_COPPER     (1 << 11, OFPortSpeed.SPEED_NONE, false, "Copper"),
+        OFPPF_FIBER      (1 << 12, OFPortSpeed.SPEED_NONE, false, "Fiber"),
+        OFPPF_AUTONEG    (1 << 13, OFPortSpeed.SPEED_NONE, false, "Autoneg"),
+        OFPPF_PAUSE      (1 << 14, OFPortSpeed.SPEED_NONE, false, "Pause"),
+        OFPPF_PAUSE_ASYM (1 << 15, OFPortSpeed.SPEED_NONE, false, "Pause Asymm");
+
+        protected int value;
+        protected OFPortSpeed speed;
+        protected boolean isFullDuplex;
+        protected String name;
+
+        private OFPortFeatures(int value, OFPortSpeed speed, boolean isFullDuplex, String name) {
             this.value = value;
-            this.isStpState = isStpState;
+            this.speed = speed;
+            this.isFullDuplex = isFullDuplex;
+            this.name = name;
         }
 
         /**
-         * Returns true if this constants represents one of the four STP
-         * states
-         * @return
+         * Given a port features value, return the set of OFPortFeatures
+         * associated with it
+         *
+         * @param i port features bitmap
+         * @return Set<OFPortFeatures>
          */
-        public boolean isStpState() {
-            return isStpState;
-        }
-
-        /**
-         * return the STP state represented by the given integer.
-         * the returned value will have isStpState() == true
-         * @param state
-         * @return
-         */
-        public static OFPortState getStpState(int state) {
-            // this ain't pretty
-            state = state & OFPortState.OFPPS_STP_MASK.getValue();
-            for (OFPortState s: OFPortState.values()) {
-                if (!s.isStpState())
-                    continue;
-                if (state == s.getValue())
-                    return s;
+        public static EnumSet<OFPortFeatures> valueOf(int i) {
+            EnumSet<OFPortFeatures> features = EnumSet.noneOf(OFPortFeatures.class);
+            for (OFPortFeatures value: OFPortFeatures.values()) {
+                if ((i & value.getValue()) != 0)
+                    features.add(value);
             }
-            return null; // will never happen
+            return features;
         }
 
-        public static boolean isPortDown(int state) {
-            if ((state & OFPPS_LINK_DOWN.getValue()) != 0)
-                return true;
-            else
-                return false;
+        /**
+         * Given a set of OFPortFeatures enums, convert to bitmap value
+         *
+         * @param configs EnumSet<OFPortFeatures>
+         * @return bitmap value
+         */
+        public static int toBitmap(Set<OFPortFeatures> features) {
+            int bitmap = 0;
+            for (OFPortFeatures feature: features)
+                bitmap |= feature.getValue();
+            return bitmap;
         }
 
         /**
@@ -189,139 +225,28 @@ public class OFPhysicalPort {
         public int getValue() {
             return value;
         }
-    }
-
-    /**
-     * Represents the speed of a port
-     */
-    public enum PortSpeed {
-        /** no speed set */
-        SPEED_NONE(0),
-        SPEED_10MB(10),
-        SPEED_100MB(100),
-        SPEED_1GB(1000),
-        SPEED_10GB(10000);
-
-        private long speedInBps;
-        private PortSpeed(int speedInMbps) {
-            this.speedInBps = speedInMbps * 1000*1000;
-        }
-
-        public long getSpeedBps() {
-            return this.speedInBps;
-        }
-
-        public static PortSpeed max(PortSpeed s1, PortSpeed s2) {
-            return (s1.getSpeedBps() > s2.getSpeedBps()) ? s1 : s2;
-        }
-
-        public static PortSpeed min(PortSpeed s1, PortSpeed s2) {
-            return (s1.getSpeedBps() < s2.getSpeedBps()) ? s1 : s2;
-        }
-    }
-
-    public enum OFPortFeatures implements EnumBitmaps.BitmapableEnum {
-        OFPPF_10MB_HD    (1 << 0, PortSpeed.SPEED_10MB) {
-            @Override
-            public String toString() {
-                return "10mb-hd (0x1)";
-            }
-        },
-        OFPPF_10MB_FD    (1 << 1, PortSpeed.SPEED_10MB) {
-            @Override
-            public String toString() {
-                return "10mb-fd (0x2)";
-            }
-        },
-        OFPPF_100MB_HD   (1 << 2, PortSpeed.SPEED_100MB) {
-            @Override
-            public String toString() {
-                return "100mb-hd (0x4)";
-            }
-        },
-        OFPPF_100MB_FD   (1 << 3, PortSpeed.SPEED_100MB) {
-            @Override
-            public String toString() {
-                return "100mb-fd (0x8)";
-            }
-        },
-        OFPPF_1GB_HD     (1 << 4, PortSpeed.SPEED_1GB) {
-            @Override
-            public String toString() {
-                return "1gb-hd (0x10)";
-            }
-        },
-        OFPPF_1GB_FD     (1 << 5, PortSpeed.SPEED_1GB) {
-            @Override
-            public String toString() {
-                return "1gb-fd (0x20)";
-            }
-        },
-        OFPPF_10GB_FD    (1 << 6, PortSpeed.SPEED_10GB) {
-            @Override
-            public String toString() {
-                return "10gb-fd (0x40)";
-            }
-        },
-        OFPPF_COPPER     (1 << 7, PortSpeed.SPEED_NONE) {
-            @Override
-            public String toString() {
-                return "copper (0x80)";
-            }
-        },
-        OFPPF_FIBER      (1 << 8, PortSpeed.SPEED_NONE) {
-            @Override
-            public String toString() {
-                return "fiber (0x100)";
-            }
-        },
-        OFPPF_AUTONEG    (1 << 9, PortSpeed.SPEED_NONE) {
-            @Override
-            public String toString() {
-                return "autoneg (0x200)";
-            }
-        },
-        OFPPF_PAUSE      (1 << 10, PortSpeed.SPEED_NONE) {
-            @Override
-            public String toString() {
-                return "pause (0x400)";
-            }
-        },
-        OFPPF_PAUSE_ASYM (1 << 11, PortSpeed.SPEED_NONE) {
-            @Override
-            public String toString() {
-                return "pause-asym (0x800)";
-            }
-        };
-
-        protected int value;
-        protected PortSpeed speed;
-
-        private OFPortFeatures(int value, PortSpeed speed) {
-            this.value = value;
-            if (speed == null)
-                throw new NullPointerException();
-            this.speed = speed;
-        }
 
         /**
-         * @return the bitmap value for this constant
+         * @return the port speed
          */
-        @Override
-        public int getValue() {
-            return value;
-        }
-
-        /**
-         * @return the port speed associated with this constant. If the
-         * constant doesn't represent a port speed it returns SPEED_NONE
-         */
-        public PortSpeed getSpeed() {
+        public OFPortSpeed getPortSpeed() {
             return speed;
         }
+
+        /**
+         * @return boolean about full duplex
+         */
+        public boolean isFullDuplex() {
+            return isFullDuplex;
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
     }
 
-    protected short portNumber;
+    protected int portNumber;
     protected byte[] hardwareAddress;
     protected String name;
     protected int config;
@@ -331,25 +256,26 @@ public class OFPhysicalPort {
     protected int supportedFeatures;
     protected int peerFeatures;
 
+    protected int currSpeed;
+    protected int maxSpeed;
     /**
      * @return the portNumber
      */
-    @JsonSerialize(using=UShortSerializer.class)
-    public short getPortNumber() {
+    public int getPortNumber() {
         return portNumber;
     }
 
     /**
      * @param portNumber the portNumber to set
      */
-    public void setPortNumber(short portNumber) {
+    public OFPhysicalPort setPortNumber(int portNumber) {
         this.portNumber = portNumber;
+        return this;
     }
 
     /**
      * @return the hardwareAddress
      */
-    @JsonSerialize(using=ByteArrayMACSerializer.class)
     public byte[] getHardwareAddress() {
         return hardwareAddress;
     }
@@ -357,11 +283,12 @@ public class OFPhysicalPort {
     /**
      * @param hardwareAddress the hardwareAddress to set
      */
-    public void setHardwareAddress(byte[] hardwareAddress) {
+    public OFPhysicalPort setHardwareAddress(byte[] hardwareAddress) {
         if (hardwareAddress.length != OFP_ETH_ALEN)
             throw new RuntimeException("Hardware address must have length "
                     + OFP_ETH_ALEN);
         this.hardwareAddress = hardwareAddress;
+        return this;
     }
 
     /**
@@ -374,8 +301,9 @@ public class OFPhysicalPort {
     /**
      * @param name the name to set
      */
-    public void setName(String name) {
+    public OFPhysicalPort setName(String name) {
         this.name = name;
+        return this;
     }
 
     /**
@@ -388,8 +316,9 @@ public class OFPhysicalPort {
     /**
      * @param config the config to set
      */
-    public void setConfig(int config) {
+    public OFPhysicalPort setConfig(int config) {
         this.config = config;
+        return this;
     }
 
     /**
@@ -402,8 +331,9 @@ public class OFPhysicalPort {
     /**
      * @param state the state to set
      */
-    public void setState(int state) {
+    public OFPhysicalPort setState(int state) {
         this.state = state;
+        return this;
     }
 
     /**
@@ -416,8 +346,9 @@ public class OFPhysicalPort {
     /**
      * @param currentFeatures the currentFeatures to set
      */
-    public void setCurrentFeatures(int currentFeatures) {
+    public OFPhysicalPort setCurrentFeatures(int currentFeatures) {
         this.currentFeatures = currentFeatures;
+        return this;
     }
 
     /**
@@ -430,8 +361,9 @@ public class OFPhysicalPort {
     /**
      * @param advertisedFeatures the advertisedFeatures to set
      */
-    public void setAdvertisedFeatures(int advertisedFeatures) {
+    public OFPhysicalPort setAdvertisedFeatures(int advertisedFeatures) {
         this.advertisedFeatures = advertisedFeatures;
+        return this;
     }
 
     /**
@@ -444,8 +376,9 @@ public class OFPhysicalPort {
     /**
      * @param supportedFeatures the supportedFeatures to set
      */
-    public void setSupportedFeatures(int supportedFeatures) {
+    public OFPhysicalPort setSupportedFeatures(int supportedFeatures) {
         this.supportedFeatures = supportedFeatures;
+        return this;
     }
 
     /**
@@ -458,21 +391,54 @@ public class OFPhysicalPort {
     /**
      * @param peerFeatures the peerFeatures to set
      */
-    public void setPeerFeatures(int peerFeatures) {
+    public OFPhysicalPort setPeerFeatures(int peerFeatures) {
         this.peerFeatures = peerFeatures;
+        return this;
+    }
+
+    /**
+     * @return the currSpeed
+     */
+    public int getCurrSpeed() {
+        return currSpeed;
+    }
+
+    /**
+     * @param currSpeed the curr_speed to set
+     */
+    public OFPhysicalPort setCurrSpeed(int currSpeed) {
+        this.currSpeed = currSpeed;
+        return this;
+    }
+
+    /**
+     * @return the maxSpeed
+     */
+    public int getMaxSpeed() {
+        return maxSpeed;
+    }
+
+    /**
+     * @param maxSpeed the max_speed to set
+     */
+    public OFPhysicalPort setMaxSpeed(int maxSpeed) {
+        this.maxSpeed = maxSpeed;
+        return this;
     }
 
     /**
      * Read this message off the wire from the specified ByteBuffer
      * @param data
      */
-    public void readFrom(ChannelBuffer data) {
-        this.portNumber = data.readShort();
+    public void readFrom(ByteBuffer data) {
+        this.portNumber = data.getInt();
+        data.position(data.position() + 4); // pad
         if (this.hardwareAddress == null)
             this.hardwareAddress = new byte[OFP_ETH_ALEN];
-        data.readBytes(this.hardwareAddress);
-        byte[] name = new byte[16];
-        data.readBytes(name);
+        data.get(this.hardwareAddress);
+        data.position(data.position() + 2); // pad
+        byte[] name = new byte[OFP_MAX_PORT_NAME_LEN];
+        data.get(name);
         // find the first index of 0
         int index = 0;
         for (byte b : name) {
@@ -482,57 +448,67 @@ public class OFPhysicalPort {
         }
         this.name = new String(Arrays.copyOf(name, index),
                 Charset.forName("ascii"));
-        this.config = data.readInt();
-        this.state = data.readInt();
-        this.currentFeatures = data.readInt();
-        this.advertisedFeatures = data.readInt();
-        this.supportedFeatures = data.readInt();
-        this.peerFeatures = data.readInt();
+        this.config = data.getInt();
+        this.state = data.getInt();
+        this.currentFeatures = data.getInt();
+        this.advertisedFeatures = data.getInt();
+        this.supportedFeatures = data.getInt();
+        this.peerFeatures = data.getInt();
+        this.currSpeed = data.getInt();
+        this.maxSpeed = data.getInt();
     }
 
     /**
      * Write this message's binary format to the specified ByteBuffer
      * @param data
      */
-    public void writeTo(ChannelBuffer data) {
-        data.writeShort(this.portNumber);
-        data.writeBytes(hardwareAddress);
+    public void writeTo(ByteBuffer data) {
+        data.putInt(this.portNumber);
+        data.putInt(0); // pad
+        data.put(hardwareAddress);
+        data.putShort((short)0); // pad
         try {
             byte[] name = this.name.getBytes("ASCII");
-            if (name.length < 16) {
-                data.writeBytes(name);
-                for (int i = name.length; i < 16; ++i) {
-                    data.writeByte((byte) 0);
+            if (name.length < OFP_MAX_PORT_NAME_LEN) {
+                data.put(name);
+                for (int i = name.length; i < OFP_MAX_PORT_NAME_LEN; ++i) {
+                    data.put((byte) 0);
                 }
             } else {
-                data.writeBytes(name, 0, 15);
-                data.writeByte((byte) 0);
+                data.put(name, 0, OFP_MAX_PORT_NAME_LEN-1);
+                data.put((byte) 0);
             }
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
-        data.writeInt(this.config);
-        data.writeInt(this.state);
-        data.writeInt(this.currentFeatures);
-        data.writeInt(this.advertisedFeatures);
-        data.writeInt(this.supportedFeatures);
-        data.writeInt(this.peerFeatures);
+        data.putInt(this.config);
+        data.putInt(this.state);
+        data.putInt(this.currentFeatures);
+        data.putInt(this.advertisedFeatures);
+        data.putInt(this.supportedFeatures);
+        data.putInt(this.peerFeatures);
+        data.putInt(this.currSpeed);
+        data.putInt(this.maxSpeed);
     }
 
     @Override
     public int hashCode() {
         final int prime = 307;
         int result = 1;
-        result = prime * result + advertisedFeatures;
-        result = prime * result + config;
-        result = prime * result + currentFeatures;
-        result = prime * result + Arrays.hashCode(hardwareAddress);
-        result = prime * result + ((name == null) ? 0 : name.hashCode());
-        result = prime * result + peerFeatures;
         result = prime * result + portNumber;
-        result = prime * result + state;
-        result = prime * result + supportedFeatures;
         return result;
+    }
+
+    @Override
+    public String toString() {
+        return "OFPhysicalPort [name=" + name + ", portNumber=" + portNumber + 
+                ", hardwareAddress=" + HexString.toHexString(hardwareAddress) + 
+                ", config=" + config + ", state=" + OFPortState.valueOf(state) + 
+                ", currSpeed=" + currSpeed + "kbps, maxSpeed=" + maxSpeed + 
+                "kbps, currentFeatures=" + OFPortFeatures.valueOf(currentFeatures) + 
+                ", advertisedFeatures=" + OFPortFeatures.valueOf(advertisedFeatures) + 
+                ", supportedFeatures=" + OFPortFeatures.valueOf(supportedFeatures) + 
+                ", peerFeatures=" + OFPortFeatures.valueOf(peerFeatures) + "]";    
     }
 
     @Override
@@ -547,68 +523,31 @@ public class OFPhysicalPort {
             return false;
         }
         OFPhysicalPort other = (OFPhysicalPort) obj;
-        if (advertisedFeatures != other.advertisedFeatures) {
+        if (portNumber != other.portNumber) 
             return false;
-        }
-        if (config != other.config) {
+        if (portNumber != other.portNumber) 
             return false;
-        }
-        if (currentFeatures != other.currentFeatures) {
-            return false;
-        }
-        if (!Arrays.equals(hardwareAddress, other.hardwareAddress)) {
-            return false;
-        }
-        if (name == null) {
-            if (other.name != null) {
+        if (name != other.name) 
                 return false;
-            }
-        } else if (!name.equals(other.name)) {
-            return false;
-        }
-        if (peerFeatures != other.peerFeatures) {
-            return false;
-        }
-        if (portNumber != other.portNumber) {
-            return false;
-        }
-        if (state != other.state) {
-            return false;
-        }
-        if (supportedFeatures != other.supportedFeatures) {
-            return false;
-        }
-        return true;
-    }
+        if (config != other.config) 
+                return false;
+        if (state != other.state) 
+                return false;
+        if (currentFeatures != other.currentFeatures) 
+                return false;
+        if (advertisedFeatures != other.advertisedFeatures) 
+                return false;
+        if (supportedFeatures != other.supportedFeatures) 
+                return false;
+        if (peerFeatures != other.peerFeatures) 
+                return false;
+        if (hardwareAddress.equals(other.hardwareAddress))
+                return false;
+        if (currSpeed != other.currSpeed) 
+                return false;
+        if (maxSpeed != other.maxSpeed) 
+                return false;
 
-    @Override
-    public String toString() {
-        String linkState, linkSpeed;
-        if ((state & OFPortState.OFPPS_LINK_DOWN.getValue()) != 0) {
-            linkState = "down";
-        } else {
-            linkState = "up";
-        }
-        if ((currentFeatures & OFPortFeatures.OFPPF_10GB_FD.getValue()) != 0) {
-            linkSpeed = "10G";
-        } else if ((currentFeatures & OFPortFeatures.OFPPF_1GB_FD.getValue()) != 0) {
-            linkSpeed = "1G";
-        } else if ((currentFeatures & OFPortFeatures.OFPPF_1GB_HD.getValue()) != 0) {
-            linkSpeed = "1G(half-duplex)";
-        } else if ((currentFeatures & OFPortFeatures.OFPPF_100MB_FD.getValue()) != 0) {
-            linkSpeed = "100M";
-        } else if ((currentFeatures & OFPortFeatures.OFPPF_100MB_HD.getValue()) != 0) {
-            linkSpeed = "100M(half-duplex)";
-        } else if ((currentFeatures & OFPortFeatures.OFPPF_10MB_FD.getValue()) != 0) {
-            linkSpeed = "10M";
-        } else if ((currentFeatures & OFPortFeatures.OFPPF_10MB_HD.getValue()) != 0) {
-            linkSpeed = "10M(half-duplex)";
-        } else {
-            linkSpeed = "unknown";
-        }
-        return "port " + name + " (" +  portNumber + ")" +
-               ", mac " + HexString.toHexString(hardwareAddress) +
-               ", state " + linkState +
-               ", speed " + linkSpeed;
+        return true;
     }
 }

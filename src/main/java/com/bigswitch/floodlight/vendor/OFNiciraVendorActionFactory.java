@@ -1,6 +1,6 @@
 package com.bigswitch.floodlight.vendor;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 import org.openflow.protocol.action.OFActionVendor;
 import org.openflow.protocol.factory.OFVendorActionFactory;
 import org.slf4j.Logger;
@@ -17,11 +17,11 @@ public class OFNiciraVendorActionFactory implements OFVendorActionFactory {
     }
 
     @Override
-    public OFActionVendor readFrom(ChannelBuffer data) {
-        data.markReaderIndex();
+    public OFActionVendor readFrom(ByteBuffer data) {
+        data.mark();
         OFActionNiciraVendorDemux demux = new OFActionNiciraVendorDemux();
         demux.readFrom(data);
-        data.resetReaderIndex();
+        data.reset();
 
         switch(demux.getSubtype()) {
             case OFActionNiciraTtlDecrement.TTL_DECREMENT_SUBTYPE:

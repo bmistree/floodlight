@@ -8,12 +8,12 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
-import net.floodlightcontroller.util.EnumBitmaps;
 import org.openflow.protocol.OFPhysicalPort;
 import org.openflow.protocol.OFPhysicalPort.OFPortConfig;
 import org.openflow.protocol.OFPhysicalPort.OFPortFeatures;
 import org.openflow.protocol.OFPhysicalPort.OFPortState;
-import org.openflow.protocol.OFPhysicalPort.PortSpeed;
+import org.openflow.protocol.OFPhysicalPort.OFPortSpeed;
+import org.openflow.protocol.statistics.OFPortDescription;
 import org.openflow.util.HexString;
 
 
@@ -34,29 +34,27 @@ import org.openflow.util.HexString;
  *
  */
 public class ImmutablePort {
-    private final short portNumber;
+    private final int portNumber;
     private final byte[] hardwareAddress;
     private final String name;
     private final EnumSet<OFPortConfig> config;
-    private final boolean portStateLinkDown;
-    private final OFPortState stpState;
+    private final OFPortState portState;
     private final EnumSet<OFPortFeatures> currentFeatures;
     private final EnumSet<OFPortFeatures> advertisedFeatures;
     private final EnumSet<OFPortFeatures> supportedFeatures;
     private final EnumSet<OFPortFeatures> peerFeatures;
-
+    
     /**
      * A builder class to create ImmutablePort instances
      *
      * TODO: add methods to remove elements from the EnumSets
      */
     public static class Builder {
-        private short portNumber;
+        private int portNumber;
         private byte[] hardwareAddress;
         private String name;
         private EnumSet<OFPortConfig> config;
-        private boolean portStateLinkDown;
-        private OFPortState stpState;
+        private OFPortState portState;
         private EnumSet<OFPortFeatures> currentFeatures;
         private EnumSet<OFPortFeatures> advertisedFeatures;
         private EnumSet<OFPortFeatures> supportedFeatures;
@@ -67,8 +65,7 @@ public class ImmutablePort {
             this.hardwareAddress = new byte[] { 0, 0, 0, 0, 0, 0 };
             this.name = "";
             this.config = EnumSet.noneOf(OFPortConfig.class);
-            this.portStateLinkDown = false;
-            this.stpState = OFPortState.OFPPS_STP_LISTEN;
+            this.portState = OFPortState.OFPPS_LIVE;
             this.currentFeatures = EnumSet.noneOf(OFPortFeatures.class);
             this.advertisedFeatures = EnumSet.noneOf(OFPortFeatures.class);
             this.supportedFeatures = EnumSet.noneOf(OFPortFeatures.class);
@@ -80,8 +77,7 @@ public class ImmutablePort {
             this.hardwareAddress = p.getHardwareAddress();
             this.name = p.getName();
             this.config = EnumSet.copyOf(p.getConfig());
-            this.portStateLinkDown = p.isLinkDown();
-            this.stpState = p.getStpState();
+            this.portState = p.getPortState();
             this.currentFeatures = EnumSet.copyOf(p.getCurrentFeatures());
             this.advertisedFeatures = EnumSet.copyOf(p.getAdvertisedFeatures());
             this.supportedFeatures = EnumSet.copyOf(p.getSupportedFeatures());
@@ -91,7 +87,7 @@ public class ImmutablePort {
         /**
          * @param portNumber the portNumber to set
          */
-        public Builder setPortNumber(short portNumber) {
+        public Builder setPortNumber(int portNumber) {
             this.portNumber = portNumber;
             return this;
         }
@@ -129,24 +125,12 @@ public class ImmutablePort {
             return this;
         }
         /**
-         * @param portStateLinkDown the portStateLinkDown to set
+         * @param portState the portState to set
          */
-        public Builder setPortStateLinkDown(boolean portStateLinkDown) {
-            this.portStateLinkDown = portStateLinkDown;
-            return this;
-        }
-        /**
-         * @param stpState the stpState to set
-         */
-        public Builder setStpState(OFPortState stpState) {
-            if (stpState == null)
-                throw new NullPointerException("stpState must not be null");
-            if (!stpState.isStpState()) {
-                String msg = String.format("OFPortState enum constant %s " +
-                        "is not an STP state", stpState);
-                throw new IllegalArgumentException(msg);
-            }
-            this.stpState = stpState;
+        public Builder setPortState(OFPortState portState) {
+            if (portState == null)
+                throw new NullPointerException("portState must not be null");
+            this.portState = portState;
             return this;
         }
         /**
@@ -198,15 +182,13 @@ public class ImmutablePort {
                                      hardwareAddress,
                                      name,
                                      EnumSet.copyOf(config),
-                                     portStateLinkDown,
-                                     stpState,
+                                     portState,
                                      EnumSet.copyOf(currentFeatures),
                                      EnumSet.copyOf(advertisedFeatures),
                                      EnumSet.copyOf(supportedFeatures),
                                      EnumSet.copyOf(peerFeatures));
         }
     }
-
 
     public static ImmutablePort fromOFPhysicalPort(OFPhysicalPort p) {
         if (p == null) {
@@ -218,33 +200,26 @@ public class ImmutablePort {
         if (p.getName() == null) {
             throw new NullPointerException("Port name must not be null");
         }
-
+        
         return new ImmutablePort(
-
                 p.getPortNumber(),
                 Arrays.copyOf(p.getHardwareAddress(), 6),
                 p.getName(),
-                EnumBitmaps.toEnumSet(OFPortConfig.class, p.getConfig()),
-                OFPortState.isPortDown(p.getState()),
-                OFPortState.getStpState(p.getState()),
-                EnumBitmaps.toEnumSet(OFPortFeatures.class,
-                                      p.getCurrentFeatures()),
-                EnumBitmaps.toEnumSet(OFPortFeatures.class,
-                                      p.getAdvertisedFeatures()),
-                EnumBitmaps.toEnumSet(OFPortFeatures.class,
-                                      p.getSupportedFeatures()),
-                EnumBitmaps.toEnumSet(OFPortFeatures.class,
-                                      p.getPeerFeatures())
-                                      );
+                OFPortConfig.valueOf(p.getConfig()),
+                OFPortState.valueOf(p.getState()),
+                OFPortFeatures.valueOf(p.getCurrentFeatures()),
+                OFPortFeatures.valueOf(p.getAdvertisedFeatures()),
+                OFPortFeatures.valueOf(p.getSupportedFeatures()),
+                OFPortFeatures.valueOf(p.getPeerFeatures())
+             );
     }
 
-    public static ImmutablePort create(String name, Short portNumber) {
+    public static ImmutablePort create(String name, Integer portNumber) {
         return new ImmutablePort(portNumber,
                                          new byte[] { 0, 0, 0, 0, 0, 0 },
                                          name,
                                          EnumSet.noneOf(OFPortConfig.class),
-                                         false,
-                                         OFPortState.OFPPS_STP_LISTEN,
+                                         OFPortState.OFPPS_LIVE,
                                          EnumSet.noneOf(OFPortFeatures.class),
                                          EnumSet.noneOf(OFPortFeatures.class),
                                          EnumSet.noneOf(OFPortFeatures.class),
@@ -263,16 +238,15 @@ public class ImmutablePort {
      * @param name
      * @param config
      * @param portStateLinkDown
-     * @param portStateStp
+     * @param portState
      * @param currentFeatures
      * @param advertisedFeatures
      * @param supportedFeatures
      * @param peerFeatures
      */
-    private ImmutablePort(short portNumber, byte[] hardwareAddress,
+    private ImmutablePort(int portNumber, byte[] hardwareAddress,
                                  String name, EnumSet<OFPortConfig> config,
-                                 boolean portStateLinkDown,
-                                 OFPortState portStateStp,
+                                 OFPortState portState,
                                  EnumSet<OFPortFeatures> currentFeatures,
                                  EnumSet<OFPortFeatures> advertisedFeatures,
                                  EnumSet<OFPortFeatures> supportedFeatures,
@@ -290,8 +264,8 @@ public class ImmutablePort {
         }
         if (config == null)
             throw new NullPointerException("portConfig must not be null");
-        if (portStateStp == null)
-            throw new NullPointerException("portStateStp must not be null");
+        if (portState == null)
+            throw new NullPointerException("portState must not be null");
         if (currentFeatures == null)
             throw new NullPointerException("currentFeatures must not be null");
         if (advertisedFeatures == null)
@@ -305,15 +279,14 @@ public class ImmutablePort {
         this.hardwareAddress = hardwareAddress;
         this.name = name;
         this.config = config;
-        this.portStateLinkDown = portStateLinkDown;
-        this.stpState = portStateStp;
+        this.portState = portState;
         this.currentFeatures = currentFeatures;
         this.advertisedFeatures = advertisedFeatures;
         this.supportedFeatures = supportedFeatures;
         this.peerFeatures = peerFeatures;
     }
 
-    public short getPortNumber() {
+    public int getPortNumber() {
         return portNumber;
     }
 
@@ -335,17 +308,17 @@ public class ImmutablePort {
      * @return
      */
     public boolean isLinkDown() {
-        return portStateLinkDown;
+        return ((portState.getValue() & OFPortState.OFPPS_LINK_DOWN.getValue()) != 0);
     }
 
     /**
      * Returns the STP state portion of the OFPortState. The returned
      * enum constant will be one of the four STP states and will have
-     * isStpState() return true
+     * isPortState() return true
      * @return
      */
-    public OFPortState getStpState() {
-        return this.stpState;
+    public OFPortState getPortState() {
+        return this.portState;
     }
 
     public Set<OFPortFeatures> getCurrentFeatures() {
@@ -372,7 +345,7 @@ public class ImmutablePort {
      * @return
      */
     public boolean isEnabled() {
-        return (!portStateLinkDown &&
+        return (!isLinkDown() &&
                 !config.contains(OFPortConfig.OFPPC_PORT_DOWN));
     }
 
@@ -380,12 +353,12 @@ public class ImmutablePort {
      * @return the speed of the port (from currentFeatures) if the port is
      * enabled, otherwise return SPEED_NONE
      */
-    public PortSpeed getCurrentPortSpeed() {
+    public OFPortSpeed getCurrentPortSpeed() {
         if (!isEnabled())
-            return PortSpeed.SPEED_NONE;
-        PortSpeed maxSpeed = PortSpeed.SPEED_NONE;
+            return OFPortSpeed.SPEED_NONE;
+        OFPortSpeed maxSpeed = OFPortSpeed.SPEED_NONE;
         for (OFPortFeatures f: currentFeatures)
-            PortSpeed.max(maxSpeed, f.getSpeed());
+            OFPortSpeed.max(maxSpeed, f.getPortSpeed());
         return maxSpeed;
     }
 
@@ -394,17 +367,17 @@ public class ImmutablePort {
         ofpp.setPortNumber(this.getPortNumber());
         ofpp.setHardwareAddress(this.getHardwareAddress());
         ofpp.setName(this.getName());
-        ofpp.setConfig(EnumBitmaps.toBitmap(this.getConfig()));
-        int state = this.getStpState().getValue();
+        ofpp.setConfig(OFPortConfig.toBitmap(this.getConfig()));
+        int state = this.getPortState().getValue();
         if (this.isLinkDown())
             state |= OFPortState.OFPPS_LINK_DOWN.getValue();
         ofpp.setState(state);
-        ofpp.setCurrentFeatures(EnumBitmaps.toBitmap(this.getCurrentFeatures()));
+        ofpp.setCurrentFeatures(OFPortFeatures.toBitmap(this.getCurrentFeatures()));
         ofpp.setAdvertisedFeatures(
-                EnumBitmaps.toBitmap(this.getAdvertisedFeatures()));
+                OFPortFeatures.toBitmap(this.getAdvertisedFeatures()));
         ofpp.setSupportedFeatures(
-                EnumBitmaps.toBitmap(this.getSupportedFeatures()));
-        ofpp.setPeerFeatures(EnumBitmaps.toBitmap(this.getPeerFeatures()));
+                OFPortFeatures.toBitmap(this.getSupportedFeatures()));
+        ofpp.setPeerFeatures(OFPortFeatures.toBitmap(this.getPeerFeatures()));
         return ofpp;
     }
 
@@ -440,9 +413,8 @@ public class ImmutablePort {
         result = prime * result
                  + ((peerFeatures == null) ? 0 : peerFeatures.hashCode());
         result = prime * result + portNumber;
-        result = prime * result + (portStateLinkDown ? 1231 : 1237);
         result = prime * result
-                 + ((stpState == null) ? 0 : stpState.hashCode());
+                 + ((portState == null) ? 0 : portState.hashCode());
         result = prime
                  * result
                  + ((supportedFeatures == null) ? 0
@@ -479,13 +451,35 @@ public class ImmutablePort {
         if (peerFeatures == null) {
             if (other.peerFeatures != null) return false;
         } else if (!peerFeatures.equals(other.peerFeatures)) return false;
-        if (portStateLinkDown != other.portStateLinkDown) return false;
-        if (stpState != other.stpState) return false;
+        if (portState != other.portState) return false;
         if (supportedFeatures == null) {
             if (other.supportedFeatures != null) return false;
         } else if (!supportedFeatures.equals(other.supportedFeatures))
             return false;
         return true;
+    }
+
+    /**
+     * Convert a List of OFPortDescription to a list of ImmutablePorts.
+     * All OFPhysicalPorts within the OFPortDescription must be non-null and valid.
+     * No other checks (name / number uniqueness) are performed
+     * @param portDescriptions
+     * @return a list of {@link ImmutablePort}s. This is list is owned by
+     * the caller. The returned list is not thread-safe
+     * @throws NullPointerException if any OFPhysicalPort or important fields
+     * of any OFPhysicalPort are null
+     * @throws IllegalArgumentException
+     */
+    public static List<ImmutablePort>
+            immutablePortListOf(List<OFPortDescription> portDescriptions) {
+        if (portDescriptions == null) {
+            throw new NullPointerException("Port descriptions must not be null");
+        }
+        ArrayList<ImmutablePort> immutablePorts =
+                new ArrayList<ImmutablePort>(portDescriptions.size());
+        for (OFPortDescription pd: portDescriptions) 
+     	   immutablePorts.add(fromOFPhysicalPort(pd.getPort()));
+        return immutablePorts;
     }
 
     /**
@@ -543,15 +537,13 @@ public class ImmutablePort {
     @Override
     public String toString() {
         StringBuilder builder2 = new StringBuilder();
-        String linkState = (portStateLinkDown) ? "DOWN" : "UP";
         builder2.append("Port [")
                 .append(name)
                 .append("(").append(portNumber).append(")")
                 .append(", hardwareAddress=")
                 .append(HexString.toHexString(hardwareAddress))
                 .append(", config=").append(config)
-                .append(", link=").append(linkState)
-                .append(", stpState=").append(stpState)
+                .append(", portState=").append(portState)
                 .append(", currentFeatures=").append(currentFeatures)
                 .append(", advertisedFeatures=").append(advertisedFeatures)
                 .append(", supportedFeatures=").append(supportedFeatures)

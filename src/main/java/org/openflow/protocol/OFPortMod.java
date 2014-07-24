@@ -1,25 +1,8 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.util.U16;
 
 /**
@@ -27,9 +10,9 @@ import org.openflow.util.U16;
  * @author David Erickson (daviderickson@cs.stanford.edu)
  */
 public class OFPortMod extends OFMessage {
-    public static int MINIMUM_LENGTH = 32;
+    public static int MINIMUM_LENGTH = 40;
 
-    protected short portNumber;
+    protected int portNumber;
     protected byte[] hardwareAddress;
     protected int config;
     protected int mask;
@@ -44,15 +27,16 @@ public class OFPortMod extends OFMessage {
     /**
      * @return the portNumber
      */
-    public short getPortNumber() {
+    public int getPortNumber() {
         return portNumber;
     }
 
     /**
      * @param portNumber the portNumber to set
      */
-    public void setPortNumber(short portNumber) {
+    public OFPortMod setPortNumber(int portNumber) {
         this.portNumber = portNumber;
+        return this;
     }
 
     /**
@@ -65,11 +49,12 @@ public class OFPortMod extends OFMessage {
     /**
      * @param hardwareAddress the hardwareAddress to set
      */
-    public void setHardwareAddress(byte[] hardwareAddress) {
+    public OFPortMod setHardwareAddress(byte[] hardwareAddress) {
         if (hardwareAddress.length != OFPhysicalPort.OFP_ETH_ALEN)
             throw new RuntimeException("Hardware address must have length "
                     + OFPhysicalPort.OFP_ETH_ALEN);
         this.hardwareAddress = hardwareAddress;
+        return this;
     }
 
     /**
@@ -82,8 +67,9 @@ public class OFPortMod extends OFMessage {
     /**
      * @param config the config to set
      */
-    public void setConfig(int config) {
+    public OFPortMod setConfig(int config) {
         this.config = config;
+        return this;
     }
 
     /**
@@ -96,8 +82,9 @@ public class OFPortMod extends OFMessage {
     /**
      * @param mask the mask to set
      */
-    public void setMask(int mask) {
+    public OFPortMod setMask(int mask) {
         this.mask = mask;
+        return this;
     }
 
     /**
@@ -110,32 +97,37 @@ public class OFPortMod extends OFMessage {
     /**
      * @param advertise the advertise to set
      */
-    public void setAdvertise(int advertise) {
+    public OFPortMod setAdvertise(int advertise) {
         this.advertise = advertise;
+        return this;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        this.portNumber = data.readShort();
+        this.portNumber = data.getInt();
+        data.position(data.position() + 4); // pad
         if (this.hardwareAddress == null)
             this.hardwareAddress = new byte[OFPhysicalPort.OFP_ETH_ALEN];
-        data.readBytes(this.hardwareAddress);
-        this.config = data.readInt();
-        this.mask = data.readInt();
-        this.advertise = data.readInt();
-        data.readInt(); // pad
+        data.get(this.hardwareAddress);
+        data.position(data.position() + 2); // pad
+        this.config = data.getInt();
+        this.mask = data.getInt();
+        this.advertise = data.getInt();
+        data.position(data.position() + 4); // pad
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeShort(this.portNumber);
-        data.writeBytes(this.hardwareAddress);
-        data.writeInt(this.config);
-        data.writeInt(this.mask);
-        data.writeInt(this.advertise);
-        data.writeInt(0); // pad
+        data.putInt(this.portNumber);
+        data.putInt(0); // pad
+        data.put(this.hardwareAddress);
+        data.putShort((short)0); // pad
+        data.putInt(this.config);
+        data.putInt(this.mask);
+        data.putInt(this.advertise);
+        data.putInt(0); // pad
     }
 
     @Override
@@ -178,5 +170,13 @@ public class OFPortMod extends OFMessage {
             return false;
         }
         return true;
+    }
+
+    /* (non-Javadoc)
+     * @see org.openflow.protocol.OFMessage#computeLength()
+     */
+    @Override
+    public void computeLength() {
+        this.length = (short) MINIMUM_LENGTH;
     }
 }

@@ -23,7 +23,7 @@ package net.floodlightcontroller.devicemanager.internal;
 
 public class AttachmentPoint {
     long  sw;
-    short port;
+    int port;
     long  activeSince;
     long  lastSeen;
 
@@ -34,7 +34,7 @@ public class AttachmentPoint {
     public static final long OPENFLOW_TO_EXTERNAL_TIMEOUT = 30000; // 30 seconds
     public static final long CONSISTENT_TIMEOUT = 30000;           // 30 seconds
 
-    public AttachmentPoint(long sw, short port, long activeSince,
+    public AttachmentPoint(long sw, int port, long activeSince,
                            long lastSeen) {
         this.sw = sw;
         this.port = port;
@@ -42,7 +42,7 @@ public class AttachmentPoint {
         this.lastSeen = lastSeen;
     }
 
-    public AttachmentPoint(long sw, short port, long lastSeen) {
+    public AttachmentPoint(long sw, int port, long lastSeen) {
         this.sw = sw;
         this.port = port;
         this.lastSeen = lastSeen;
@@ -62,10 +62,10 @@ public class AttachmentPoint {
     public void setSw(long sw) {
         this.sw = sw;
     }
-    public short getPort() {
+    public int getPort() {
         return port;
     }
-    public void setPort(short port) {
+    public void setPort(int port) {
         this.port = port;
     }
     public long getActiveSince() {

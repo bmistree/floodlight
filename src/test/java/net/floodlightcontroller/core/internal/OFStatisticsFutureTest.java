@@ -30,7 +30,7 @@ public class OFStatisticsFutureTest {
                                                    int count, boolean moreReplies) {
         OFStatisticsReply sr = new OFStatisticsReply();
         sr.setXid(transactionId);
-        sr.setStatisticType(OFStatisticsType.FLOW);
+        sr.setStatisticsType(OFStatisticsType.FLOW);
         List<OFStatistics> statistics = new ArrayList<OFStatistics>();
         for (int i = 0; i < count; ++i) {
             statistics.add(new OFFlowStatisticsReply());

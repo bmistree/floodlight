@@ -50,7 +50,7 @@ import org.openflow.protocol.OFStatisticsReply;
 import org.openflow.protocol.OFStatisticsRequest;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.OFVendor;
-import org.openflow.protocol.factory.BasicFactory;
+import org.openflow.protocol.factory.FloodlightFactory;
 import org.openflow.protocol.statistics.OFDescriptionStatistics;
 import org.openflow.protocol.statistics.OFStatisticsType;
 import org.openflow.util.HexString;
@@ -91,7 +91,7 @@ public class OFChannelHandlerTest {
 
     @Before
     public void setUpFeaturesReply() {
-        featuresReply = (OFFeaturesReply)BasicFactory.getInstance()
+        featuresReply = (OFFeaturesReply)FloodlightFactory.getInstance()
                 .getMessage(OFType.FEATURES_REPLY);
         featuresReply.setDatapathId(0x42L);
         featuresReply.setBuffers(1);
@@ -308,7 +308,7 @@ public class OFChannelHandlerTest {
 
         // We don't expect to receive /any/ messages in init state since
         // channelConnected moves us to a different state
-        OFMessage m = BasicFactory.getInstance().getMessage(OFType.HELLO);
+        OFMessage m = FloodlightFactory.getInstance().getMessage(OFType.HELLO);
         sendMessageToHandlerWithControllerReset(Collections.singletonList(m));
 
         verifyExceptionCaptured(SwitchStateException.class);
@@ -348,7 +348,7 @@ public class OFChannelHandlerTest {
         expectLastCall().andReturn(null).atLeastOnce();
         replay(channel);
 
-        OFMessage hello = BasicFactory.getInstance().getMessage(OFType.HELLO);
+        OFMessage hello = FloodlightFactory.getInstance().getMessage(OFType.HELLO);
         sendMessageToHandlerWithControllerReset(Collections.singletonList(hello));
 
         List<OFMessage> msgs = getMessagesFromCapture();
@@ -399,7 +399,7 @@ public class OFChannelHandlerTest {
         expectLastCall().andReturn(null).atLeastOnce();
         replay(channel);
 
-        OFGetConfigReply cr = (OFGetConfigReply)BasicFactory.getInstance()
+        OFGetConfigReply cr = (OFGetConfigReply)FloodlightFactory.getInstance()
                 .getMessage(OFType.GET_CONFIG_REPLY);
         cr.setMissSendLength((short)0xffff);
 
@@ -463,9 +463,9 @@ public class OFChannelHandlerTest {
     }
 
     private static OFStatisticsReply createDescriptionStatsReply() {
-        OFStatisticsReply sr = (OFStatisticsReply)BasicFactory.getInstance()
+        OFStatisticsReply sr = (OFStatisticsReply)FloodlightFactory.getInstance()
                 .getMessage(OFType.STATS_REPLY);
-        sr.setStatisticType(OFStatisticsType.DESC);
+        sr.setStatisticsType(OFStatisticsType.DESC);
         OFDescriptionStatistics desc = new OFDescriptionStatistics();
         desc.setDatapathDescription("Datapath Description");
         desc.setHardwareDescription("Hardware Description");
@@ -643,7 +643,7 @@ public class OFChannelHandlerTest {
         //-------------------------------------------------
         // Send a message to the handler, it should be passed to the
         // switch's sub-handshake handling.
-        OFMessage m = BasicFactory.getInstance().getMessage(OFType.HELLO);
+        OFMessage m = FloodlightFactory.getInstance().getMessage(OFType.HELLO);
         resetToStrict(sw);
         expect(sw.inputThrottled(anyObject(OFMessage.class)))
                 .andReturn(false).anyTimes();
@@ -662,7 +662,7 @@ public class OFChannelHandlerTest {
         // Send a ECHO_REQUEST. This should be handled by the OFChannelHandler
         // and *not* passed to switch sub-handshake
         // TODO: should this be also passed to the switch handshake instead?
-        m = BasicFactory.getInstance().getMessage(OFType.ECHO_REQUEST);
+        m = FloodlightFactory.getInstance().getMessage(OFType.ECHO_REQUEST);
         m.setXid(0x042042);
 
         reset(sw);
@@ -684,7 +684,7 @@ public class OFChannelHandlerTest {
         // Send a message to the handler, it should be passed to the
         // switch's sub-handshake handling. After this message the
         // sub-handshake will be complete
-        m = BasicFactory.getInstance().getMessage(OFType.FLOW_REMOVED);
+        m = FloodlightFactory.getInstance().getMessage(OFType.FLOW_REMOVED);
         resetToStrict(sw);
         expect(sw.inputThrottled(anyObject(OFMessage.class)))
                 .andReturn(false).anyTimes();
@@ -826,7 +826,7 @@ public class OFChannelHandlerTest {
 
     /** Return a Nicira RoleReply message for the given role */
     private OFMessage getRoleReply(int xid, Role role) {
-        OFVendor vm = (OFVendor)BasicFactory.getInstance()
+        OFVendor vm = (OFVendor)FloodlightFactory.getInstance()
                 .getMessage(OFType.VENDOR);
         vm.setXid(xid);
         vm.setVendor(OFNiciraVendorData.NX_VENDOR_ID);
@@ -840,7 +840,7 @@ public class OFChannelHandlerTest {
     private OFMessage getErrorMessage(OFErrorType type,
                                       int i,
                                       int xid) {
-        OFError e = (OFError) BasicFactory.getInstance()
+        OFError e = (OFError) FloodlightFactory.getInstance()
                 .getMessage(OFType.ERROR);
         e.setErrorType(type);
         e.setErrorCode((short)i);
@@ -1036,7 +1036,7 @@ public class OFChannelHandlerTest {
         expectLastCall().once();
         replay(sw);
 
-        OFMessage m = BasicFactory.getInstance().getMessage(OFType.ECHO_REPLY);
+        OFMessage m = FloodlightFactory.getInstance().getMessage(OFType.ECHO_REPLY);
 
         Thread.sleep(timeout+5);
 
@@ -1148,7 +1148,7 @@ public class OFChannelHandlerTest {
         expectLastCall().once();
         replay(sw);
 
-        OFMessage m = BasicFactory.getInstance().getMessage(OFType.ECHO_REPLY);
+        OFMessage m = FloodlightFactory.getInstance().getMessage(OFType.ECHO_REPLY);
 
         Thread.sleep(timeout+5);
 
@@ -1316,7 +1316,7 @@ public class OFChannelHandlerTest {
 
         // Send packet in. expect dispatch
         OFPacketIn pi = (OFPacketIn)
-                BasicFactory.getInstance().getMessage(OFType.PACKET_IN);
+                FloodlightFactory.getInstance().getMessage(OFType.PACKET_IN);
         reset(controller);
         controller.handleMessage(sw, pi, null);
         expectLastCall().once();
@@ -1339,7 +1339,7 @@ public class OFChannelHandlerTest {
         p.setName("Port1");
         p.setPortNumber((short)1);
         OFPortStatus ps = (OFPortStatus)
-                BasicFactory.getInstance().getMessage(OFType.PORT_STATUS);
+                FloodlightFactory.getInstance().getMessage(OFType.PORT_STATUS);
         ps.setDesc(p);
 
         // The events we expect sw.handlePortStatus to return
@@ -1397,7 +1397,7 @@ public class OFChannelHandlerTest {
         testInitialMoveToMasterWithRole();
 
         OFError err = (OFError)
-                BasicFactory.getInstance().getMessage(OFType.ERROR);
+                FloodlightFactory.getInstance().getMessage(OFType.ERROR);
         err.setXid(42);
         err.setErrorType(OFErrorType.OFPET_BAD_REQUEST);
         err.setErrorCode(OFBadRequestCode.OFPBRC_EPERM);

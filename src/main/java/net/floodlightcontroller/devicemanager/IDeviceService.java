@@ -207,9 +207,9 @@ public interface IDeviceService extends IFloodlightService {
      * @param sw
      * @param port
      */
-    public void addSuppressAPs(long swId, short port);
+    public void addSuppressAPs(long swId, int port);
 
-    public void removeSuppressAPs(long swId, short port);
+    public void removeSuppressAPs(long swId, int port);
 
     public Set<SwitchPort> getSuppressAPs();
 

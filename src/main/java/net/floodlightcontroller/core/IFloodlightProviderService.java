@@ -28,7 +28,7 @@ import net.floodlightcontroller.packet.Ethernet;
 
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFType;
-import org.openflow.protocol.factory.BasicFactory;
+import org.openflow.protocol.factory.FloodlightFactory;
 import org.openflow.vendor.nicira.OFRoleVendorData;
 
 /**
@@ -233,10 +233,10 @@ public interface IFloodlightProviderService extends
             FloodlightContext bc);
 
     /**
-     * Gets the BasicFactory
+     * Gets the FloodlightFactory
      * @return an OpenFlow message factory
      */
-    public BasicFactory getOFMessageFactory();
+    public FloodlightFactory getOFMessageFactory();
 
     /**
      * Run the main I/O loop of the Controller.

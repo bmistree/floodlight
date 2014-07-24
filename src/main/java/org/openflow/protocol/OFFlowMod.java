@@ -1,67 +1,65 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
+import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.openflow.protocol.action.OFAction;
-import org.openflow.protocol.factory.OFActionFactory;
-import org.openflow.protocol.factory.OFActionFactoryAware;
+import org.openflow.protocol.instruction.OFInstruction;
+import org.openflow.protocol.factory.OFInstructionFactory;
+import org.openflow.protocol.factory.OFInstructionFactoryAware;
 import org.openflow.util.U16;
+import org.openflow.util.U32;
 
 /**
  * Represents an ofp_flow_mod message
  * @author David Erickson (daviderickson@cs.stanford.edu)
+ * @author Srini Seetharaman (srini.seetharaman@gmail.com)
  *
  */
-public class OFFlowMod extends OFMessage implements OFActionFactoryAware, Cloneable {
-    public static int MINIMUM_LENGTH = 72;
+public class OFFlowMod extends OFMessage implements OFInstructionFactoryAware, Cloneable {
+    public static int MINIMUM_LENGTH = 56;
 
-    public static final short OFPFC_ADD = 0;                /* New flow. */
-    public static final short OFPFC_MODIFY = 1;             /* Modify all matching flows. */
-    public static final short OFPFC_MODIFY_STRICT = 2;      /* Modify entry strictly matching wildcards */
-    public static final short OFPFC_DELETE=3;               /* Delete all matching flows. */
-    public static final short OFPFC_DELETE_STRICT =4;       /* Strictly match wildcards and priority. */
+    public static final byte OFPFC_ADD = 0;                /* New flow. */
+    public static final byte OFPFC_MODIFY = 1;             /* Modify all matching flows. */
+    public static final byte OFPFC_MODIFY_STRICT = 2;      /* Modify entry strictly matching wildcards */
+    public static final byte OFPFC_DELETE=3;               /* Delete all matching flows. */
+    public static final byte OFPFC_DELETE_STRICT =4;       /* Strictly match wildcards and priority. */
 
-    // Open Flow Flow Mod Flags. Use "or" operation to set multiple flags
-    public static final short OFPFF_SEND_FLOW_REM = 0x1; // 1 << 0
-    public static final short OFPFF_CHECK_OVERLAP = 0x2; // 1 << 1
-    public static final short OFPFF_EMERG         = 0x4; // 1 << 2
+    // Flags
+    public static final short OFPFF_SEND_FLOW_REM = 1 << 0;
+    public static final short OFPFF_CHECK_OVERLAP = 1 << 1;
+    public static final short OFPFF_RESET_COUNTS = 1 << 2;
+    public static final short OFPFF_NO_PKT_COUNTS = 1 << 3;
+    public static final short OFPFF_NO_BYT_COUNTS = 1 << 4;
 
-    protected OFActionFactory actionFactory;
-    protected OFMatch match;
+    protected OFInstructionFactory instructionFactory;
     protected long cookie;
-    protected short command;
+    protected long cookieMask;
+    protected byte tableId;
+    protected byte command;
     protected short idleTimeout;
     protected short hardTimeout;
     protected short priority;
     protected int bufferId;
-    protected short outPort;
+    protected int outPort;
+    protected int outGroup;
     protected short flags;
-    protected List<OFAction> actions;
+    protected OFMatch match;
+    protected List<OFInstruction> instructions;
 
     public OFFlowMod() {
         super();
-        this.outPort = OFPort.OFPP_NONE.getValue();
         this.type = OFType.FLOW_MOD;
         this.length = U16.t(MINIMUM_LENGTH);
+        this.outPort = OFPort.OFPP_ANY.getValue();
+        this.outGroup = OFGroup.OFPG_ANY.getValue();
+        this.priority = (short)32768; 
+        this.idleTimeout = 0;
+        this.hardTimeout = 0;
+        this.bufferId = OFPacketOut.BUFFER_ID_NONE;
+        this.match = null;
+        this.flags = 0;
+        this.tableId = 0;
     }
 
     /**
@@ -99,10 +97,44 @@ public class OFFlowMod extends OFMessage implements OFActionFactoryAware, Clonea
     }
 
     /**
+     * Get cookieMask
+     * @return
+     */
+    public long getCookieMask() {
+        return this.cookieMask;
+    }
+
+    /**
+     * Set cookieMask
+     * @param cookieMask
+     */
+    public OFFlowMod setCookieMask(long cookieMask) {
+        this.cookieMask = cookieMask;
+        return this;
+    }
+
+    /**
+     * Get tableId
+     * @return
+     */
+    public byte getTableId() {
+        return this.tableId;
+    }
+
+    /**
+     * Set tableId
+     * @param tableId
+     */
+    public OFFlowMod setTableId(byte tableId) {
+        this.tableId = tableId;
+        return this;
+    }
+
+    /**
      * Get command
      * @return
      */
-    public short getCommand() {
+    public byte getCommand() {
         return this.command;
     }
 
@@ -111,13 +143,13 @@ public class OFFlowMod extends OFMessage implements OFActionFactoryAware, Clonea
      * Set command
      * @param command
      */
-    public OFFlowMod setCommand(short command) {
+    public OFFlowMod setCommand(byte command) {
         this.command = command;
         return this;
     }
 
     /**
-     * Get flags
+     * Get flags, see OFPFF_* constants
      * @return
      */
     public short getFlags() {
@@ -125,7 +157,7 @@ public class OFFlowMod extends OFMessage implements OFActionFactoryAware, Clonea
     }
 
     /**
-     * Set flags
+     * Set flags, see OFPFF_* constants
      * @param flags
      */
     public OFFlowMod setFlags(short flags) {
@@ -189,7 +221,7 @@ public class OFFlowMod extends OFMessage implements OFActionFactoryAware, Clonea
      * Get out_port
      * @return
      */
-    public short getOutPort() {
+    public int getOutPort() {
         return this.outPort;
     }
 
@@ -197,7 +229,7 @@ public class OFFlowMod extends OFMessage implements OFActionFactoryAware, Clonea
      * Set out_port
      * @param outPort
      */
-    public OFFlowMod setOutPort(short outPort) {
+    public OFFlowMod setOutPort(int outPort) {
         this.outPort = outPort;
         return this;
     }
@@ -208,6 +240,32 @@ public class OFFlowMod extends OFMessage implements OFActionFactoryAware, Clonea
      */
     public OFFlowMod setOutPort(OFPort port) {
         this.outPort = port.getValue();
+        return this;
+    }
+
+    /**
+     * Get out_group
+     * @return
+     */
+    public int getOutGroup() {
+        return this.outGroup;
+    }
+
+    /**
+     * Set out_group
+     * @param outGroup
+     */
+    public OFFlowMod setOutGroup(int outGroup) {
+        this.outGroup = outGroup;
+        return this;
+    }
+
+    /**
+     * Set out_group
+     * @param group object
+     */
+    public OFFlowMod setOutGroup(OFGroup group) {
+        this.outGroup = group.getValue();
         return this;
     }
 
@@ -229,79 +287,94 @@ public class OFFlowMod extends OFMessage implements OFActionFactoryAware, Clonea
     }
 
     /**
-     * Returns read-only copies of the actions contained in this Flow Mod
-     * @return a list of ordered OFAction objects
+     * Returns read-only copies of the instructions contained in this Flow Mod
+     * @return a list of ordered OFInstruction objects
      */
-    public List<OFAction> getActions() {
-        return this.actions;
+    public List<OFInstruction> getInstructions() {
+        return this.instructions;
     }
 
     /**
-     * Sets the list of actions this Flow Mod contains
-     * @param actions a list of ordered OFAction objects
+     * Sets the list of instructions this Flow Mod contains
+     * @param instructions a list of ordered OFInstruction objects
      */
-    public OFFlowMod setActions(List<OFAction> actions) {
-        this.actions = actions;
+    public OFFlowMod setInstructions(List<OFInstruction> instructions) {
+        this.instructions = instructions;
         return this;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
+        this.cookie = data.getLong();
+        this.cookieMask = data.getLong();
+        this.tableId = data.get();
+        this.command = data.get();
+        this.idleTimeout = data.getShort();
+        this.hardTimeout = data.getShort();
+        this.priority = data.getShort();
+        this.bufferId = data.getInt();
+        this.outPort = data.getInt();
+        this.outGroup = data.getInt();
+        this.flags = data.getShort();
+        data.position(data.position() + 2); // pad
         if (this.match == null)
             this.match = new OFMatch();
         this.match.readFrom(data);
-        this.cookie = data.readLong();
-        this.command = data.readShort();
-        this.idleTimeout = data.readShort();
-        this.hardTimeout = data.readShort();
-        this.priority = data.readShort();
-        this.bufferId = data.readInt();
-        this.outPort = data.readShort();
-        this.flags = data.readShort();
-        if (this.actionFactory == null)
-            throw new RuntimeException("OFActionFactory not set");
-        this.actions = this.actionFactory.parseActions(data, getLengthU() -
-                MINIMUM_LENGTH);
+
+        if (this.instructionFactory == null)
+            throw new RuntimeException("OFInstructionFactory not set");
+        this.instructions = this.instructionFactory.parseInstructions(data, getLengthU() -
+                MINIMUM_LENGTH + OFMatch.MINIMUM_LENGTH - match.getLength());
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
+        data.putLong(cookie);
+        data.putLong(cookieMask);
+        data.put(tableId);
+        data.put(command);
+        data.putShort(idleTimeout);
+        data.putShort(hardTimeout);
+        data.putShort(priority);
+        data.putInt(bufferId);
+        data.putInt(outPort);
+        data.putInt(outGroup);
+        data.putShort(flags);
+        data.putShort((short) 0); // pad
+        if (match == null)
+            this.match = new OFMatch();
         this.match.writeTo(data);
-        data.writeLong(cookie);
-        data.writeShort(command);
-        data.writeShort(idleTimeout);
-        data.writeShort(hardTimeout);
-        data.writeShort(priority);
-        data.writeInt(bufferId);
-        data.writeShort(outPort);
-        data.writeShort(flags);
-        if (actions != null) {
-            for (OFAction action : actions) {
-                action.writeTo(data);
+
+        if (instructions != null) {
+            for (OFInstruction instruction : instructions) {
+                instruction.writeTo(data);
             }
         }
     }
 
     @Override
-    public void setActionFactory(OFActionFactory actionFactory) {
-        this.actionFactory = actionFactory;
+    public void setInstructionFactory(OFInstructionFactory instructionFactory) {
+        this.instructionFactory = instructionFactory;
     }
 
     @Override
     public int hashCode() {
         final int prime = 227;
         int result = super.hashCode();
-        result = prime * result + ((actions == null) ? 0 : actions.hashCode());
+        result = prime * result + ((instructions == null) ? 0 : instructions.hashCode());
         result = prime * result + bufferId;
+        result = prime * result + tableId;
         result = prime * result + command;
         result = prime * result + (int) (cookie ^ (cookie >>> 32));
+        result = prime * result + (int) (cookieMask ^ (cookieMask >>> 32));
         result = prime * result + flags;
         result = prime * result + hardTimeout;
         result = prime * result + idleTimeout;
         result = prime * result + ((match == null) ? 0 : match.hashCode());
         result = prime * result + outPort;
+        result = prime * result + outGroup;
         result = prime * result + priority;
         return result;
     }
@@ -318,20 +391,26 @@ public class OFFlowMod extends OFMessage implements OFActionFactoryAware, Clonea
             return false;
         }
         OFFlowMod other = (OFFlowMod) obj;
-        if (actions == null) {
-            if (other.actions != null) {
+        if (instructions == null) {
+            if (other.instructions != null) {
                 return false;
             }
-        } else if (!actions.equals(other.actions)) {
+        } else if (!instructions.equals(other.instructions)) {
             return false;
         }
         if (bufferId != other.bufferId) {
+            return false;
+        }
+        if (tableId != other.tableId) {
             return false;
         }
         if (command != other.command) {
             return false;
         }
         if (cookie != other.cookie) {
+            return false;
+        }
+        if (cookieMask != other.cookieMask) {
             return false;
         }
         if (flags != other.flags) {
@@ -353,6 +432,9 @@ public class OFFlowMod extends OFMessage implements OFActionFactoryAware, Clonea
         if (outPort != other.outPort) {
             return false;
         }
+        if (outPort != other.outGroup) {
+            return false;
+        }
         if (priority != other.priority) {
             return false;
         }
@@ -363,15 +445,20 @@ public class OFFlowMod extends OFMessage implements OFActionFactoryAware, Clonea
      * @see java.lang.Object#clone()
      */
     @Override
-    public OFFlowMod clone() throws CloneNotSupportedException {
-        OFMatch neoMatch = match.clone();
-        OFFlowMod flowMod= (OFFlowMod) super.clone();
-        flowMod.setMatch(neoMatch);
-        List<OFAction> neoActions = new LinkedList<OFAction>();
-        for(OFAction action: this.actions)
-            neoActions.add(action.clone());
-        flowMod.setActions(neoActions);
-        return flowMod;
+    public OFFlowMod clone() {
+        try {
+            OFMatch neoMatch = match.clone();
+            OFFlowMod flowMod = (OFFlowMod) super.clone();
+            flowMod.setMatch(neoMatch);
+            List<OFInstruction> neoInstructions = new LinkedList<OFInstruction>();
+            for(OFInstruction instruction: this.instructions)
+                neoInstructions.add((OFInstruction) instruction.clone());
+            flowMod.setInstructions(neoInstructions);
+            return flowMod;
+        } catch (CloneNotSupportedException e) {
+            // Won't happen
+            throw new RuntimeException(e);
+        }
     }
 
     /* (non-Javadoc)
@@ -379,12 +466,29 @@ public class OFFlowMod extends OFMessage implements OFActionFactoryAware, Clonea
      */
     @Override
     public String toString() {
-        return "OFFlowMod [actionFactory=" + actionFactory + ", actions="
-                + actions + ", bufferId=" + bufferId + ", command=" + command
-                + ", cookie=" + Long.toHexString(cookie) + ", flags=" + flags + ", hardTimeout="
+        return "OFFlowMod [instructionFactory=" + instructionFactory + ", instructions=" + instructions 
+                + ", bufferId=" + U32.f(bufferId) + ", tableId=" + tableId +  ", command=" + command
+                + ", cookie=" + cookie + ", cookieMask=" + cookieMask + ", flags=" + flags + ", hardTimeout="
                 + hardTimeout + ", idleTimeout=" + idleTimeout + ", match="
-                + match + ", outPort=" + outPort + ", priority=" + priority
+                + match + ", outPort=" + outPort + ", outGroup=" + outGroup + ", priority=" + priority
                 + ", length=" + length + ", type=" + type + ", version="
                 + version + ", xid=" + xid + "]";
+    }
+
+    /* (non-Javadoc)
+     * @see org.openflow.protocol.OFMessage#computeLength()
+     */
+    @Override
+    public void computeLength() {
+        int l = MINIMUM_LENGTH - OFMatch.MINIMUM_LENGTH;
+        if (instructions != null) {
+            for (OFInstruction instruction : instructions) {
+                l += instruction.getLengthU();
+            }
+        }
+        if (match == null)
+            match = new OFMatch();
+        l += match.getLength();
+        this.length = U16.t(l);
     }
 }

@@ -280,7 +280,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
     //*********************
 
     @Override
-    public OFPacketOut generateLLDPMessage(long sw, short port,
+    public OFPacketOut generateLLDPMessage(long sw, int port,
                                        boolean isStandard, boolean isReverse) {
 
         IOFSwitch iofSwitch = floodlightProvider.getSwitch(sw);
@@ -333,7 +333,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
         }
 
         // set the portId to the outgoing port
-        portBB.putShort(port);
+        portBB.putShort((short)port);
         if (log.isTraceEnabled()) {
             log.trace("Sending LLDP out of interface: {}/{}",
                       HexString.toHexString(sw), port);
@@ -380,7 +380,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
         OFPacketOut po = (OFPacketOut) floodlightProvider.getOFMessageFactory()
                                                          .getMessage(OFType.PACKET_OUT);
         po.setBufferId(OFPacketOut.BUFFER_ID_NONE);
-        po.setInPort(OFPort.OFPP_NONE);
+        po.setInPort(OFPort.OFPP_ANY);
 
         // set data and data length
         po.setLengthU(OFPacketOut.MINIMUM_LENGTH + data.length);
@@ -422,7 +422,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
      * the switch port.
      */
     @Override
-    public void AddToSuppressLLDPs(long sw, short port) {
+    public void AddToSuppressLLDPs(long sw, int port) {
         NodePortTuple npt = new NodePortTuple(sw, port);
         this.suppressLinkDiscovery.add(npt);
         deleteLinksOnPort(npt, "LLDP suppressed.");
@@ -433,7 +433,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
      * that switchport.
      */
     @Override
-    public void RemoveFromSuppressLLDPs(long sw, short port) {
+    public void RemoveFromSuppressLLDPs(long sw, int port) {
         NodePortTuple npt = new NodePortTuple(sw, port);
         this.suppressLinkDiscovery.remove(npt);
         discover(npt);
@@ -444,7 +444,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
     }
 
     @Override
-    public boolean isTunnelPort(long sw, short port) {
+    public boolean isTunnelPort(long sw, int port) {
         return false;
     }
 
@@ -459,8 +459,8 @@ public class LinkDiscoveryManager implements IOFMessageListener,
     }
 
     @Override
-    public Set<Short> getQuarantinedPorts(long sw) {
-        Set<Short> qPorts = new HashSet<Short>();
+    public Set<Integer> getQuarantinedPorts(long sw) {
+        Set<Integer> qPorts = new HashSet<Integer>();
 
         Iterator<NodePortTuple> iter = quarantineQueue.iterator();
         while (iter.hasNext()) {
@@ -619,7 +619,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
         return false;
     }
 
-    private Command handleLldp(LLDP lldp, long sw, short inPort,
+    private Command handleLldp(LLDP lldp, long sw, int inPort,
                                boolean isStandard, FloodlightContext cntx) {
         // If LLDP is suppressed on this port, ignore received packet as well
         IOFSwitch iofSwitch = floodlightProvider.getSwitch(sw);
@@ -809,7 +809,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
      * @param sw
      * @param p
      */
-    private void processNewPort(long sw, short p) {
+    private void processNewPort(long sw, int p) {
         if (isLinkDiscoverySuppressed(sw, p)) {
             // Do nothing as link discovery is suppressed.
             return;
@@ -877,7 +877,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
         } while (updates.peek() != null);
     }
 
-    protected boolean isLinkDiscoverySuppressed(long sw, short portNumber) {
+    protected boolean isLinkDiscoverySuppressed(long sw, int portNumber) {
         return this.suppressLinkDiscovery.contains(new NodePortTuple(sw,
                                                                      portNumber));
     }
@@ -991,7 +991,12 @@ public class LinkDiscoveryManager implements IOFMessageListener,
         }
     }
 
-    private void generateSwitchPortStatusUpdate(long sw, short port) {
+    private boolean isPortUp(int portStateValue) {
+    	OFPortState portState = OFPortState.valueOf(portStateValue);
+    	return (portState == OFPortState.OFPPS_LIVE);
+    }
+    
+    private void generateSwitchPortStatusUpdate(long sw, int port) {
         UpdateOperation operation;
 
         IOFSwitch iofSwitch = floodlightProvider.getSwitch(sw);
@@ -1000,12 +1005,8 @@ public class LinkDiscoveryManager implements IOFMessageListener,
         OFPhysicalPort ofp = iofSwitch.getPort(port).toOFPhysicalPort();
         if (ofp == null) return;
 
-        int srcPortState = ofp.getState();
-        boolean portUp = ((srcPortState & OFPortState.OFPPS_STP_MASK.getValue())
-                               != OFPortState.OFPPS_STP_BLOCK.getValue());
-
-        if (portUp)
-            operation = UpdateOperation.PORT_UP;
+        if (isPortUp(ofp.getState()))
+        		operation = UpdateOperation.PORT_UP;
         else
             operation = UpdateOperation.PORT_DOWN;
 
@@ -1016,7 +1017,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
         discover(npt.getNodeId(), npt.getPortId());
     }
 
-    protected void discover(long sw, short port) {
+    protected void discover(long sw, int port) {
         sendDiscoveryMessage(sw, port, true, false);
     }
 
@@ -1027,7 +1028,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
      * @param isStandard
      * @return
      */
-    protected boolean isIncomingDiscoveryAllowed(long sw, short port,
+    protected boolean isIncomingDiscoveryAllowed(long sw, int port,
                                                  boolean isStandard) {
 
         if (isLinkDiscoverySuppressed(sw, port)) {
@@ -1062,7 +1063,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
      * @param isReverse
      * @return
      */
-    protected boolean isOutgoingDiscoveryAllowed(long sw, short port,
+    protected boolean isOutgoingDiscoveryAllowed(long sw, int port,
                                                  boolean isStandard,
                                                  boolean isReverse) {
 
@@ -1126,7 +1127,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
                    explanation = "An I/O error occured while sending LLDP message "
                                  + "to the switch.",
                    recommendation = LogMessageDoc.CHECK_SWITCH)
-    protected void sendDiscoveryMessage(long sw, short port,
+    protected void sendDiscoveryMessage(long sw, int port,
                                         boolean isStandard, boolean isReverse) {
 
         // Takes care of all checks including null pointer checks.
@@ -1202,19 +1203,14 @@ public class LinkDiscoveryManager implements IOFMessageListener,
 
     protected UpdateOperation getUpdateOperation(int srcPortState,
                                                  int dstPortState) {
-        boolean added = (((srcPortState & OFPortState.OFPPS_STP_MASK.getValue())
-                                != OFPortState.OFPPS_STP_BLOCK.getValue()) &&
-                          ((dstPortState & OFPortState.OFPPS_STP_MASK.getValue())
-                                != OFPortState.OFPPS_STP_BLOCK.getValue()));
-
-        if (added) return UpdateOperation.LINK_UPDATED;
+        boolean added = (isPortUp(srcPortState) && (isPortUp(dstPortState)));
+        if (added) 
+        	return UpdateOperation.LINK_UPDATED;
         return UpdateOperation.LINK_REMOVED;
     }
 
     protected UpdateOperation getUpdateOperation(int srcPortState) {
-        boolean portUp = ((srcPortState & OFPortState.OFPPS_STP_MASK.getValue()) != OFPortState.OFPPS_STP_BLOCK.getValue());
-
-        if (portUp)
+        if (isPortUp(srcPortState))
             return UpdateOperation.PORT_UP;
         else
             return UpdateOperation.PORT_DOWN;
@@ -1227,8 +1223,8 @@ public class LinkDiscoveryManager implements IOFMessageListener,
     /**
      * This method is used to specifically ignore/consider specific links.
      */
-    protected boolean isLinkAllowed(long src, short srcPort,
-                                    long dst, short dstPort) {
+    protected boolean isLinkAllowed(long src, int srcPort,
+                                    long dst, int dstPort) {
         return true;
     }
 
@@ -1605,7 +1601,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
     //******************
     // IOFSwitchListener
     //******************
-    private void handlePortDown(long switchId, short portNumber) {
+    private void handlePortDown(long switchId, int portNumber) {
             NodePortTuple npt = new NodePortTuple(switchId, portNumber);
             deleteLinksOnPort(npt, "Port Status Changed");
             LDUpdate update = new LDUpdate(switchId, portNumber,
@@ -1682,7 +1678,7 @@ public class LinkDiscoveryManager implements IOFMessageListener,
     public void switchActivated(long switchId) {
         IOFSwitch sw = floodlightProvider.getSwitch(switchId);
         if (sw.getEnabledPortNumbers() != null) {
-            for (Short p : sw.getEnabledPortNumbers()) {
+            for (Integer p : sw.getEnabledPortNumbers()) {
                 processNewPort(sw.getId(), p);
             }
         }
@@ -2161,19 +2157,19 @@ public class LinkDiscoveryManager implements IOFMessageListener,
         long srcDpid;
 
         @EventColumn(name = "srcPort", description = EventFieldType.PRIMITIVE)
-        short srcPort;
+        int srcPort;
 
         @EventColumn(name = "dstSw", description = EventFieldType.DPID)
         long dstDpid;
 
         @EventColumn(name = "dstPort", description = EventFieldType.PRIMITIVE)
-        short dstPort;
+        int dstPort;
 
         @EventColumn(name = "reason", description = EventFieldType.STRING)
         String reason;
 
-        public DirectLinkEvent(long srcDpid, short srcPort, long dstDpid,
-                               short dstPort, String reason) {
+        public DirectLinkEvent(long srcDpid, int srcPort, long dstDpid,
+                               int dstPort, String reason) {
             this.srcDpid = srcDpid;
             this.srcPort = srcPort;
             this.dstDpid = dstDpid;

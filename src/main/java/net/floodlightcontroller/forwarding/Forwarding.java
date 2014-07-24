@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
@@ -48,6 +49,7 @@ import net.floodlightcontroller.topology.ITopologyService;
 
 import org.openflow.protocol.OFFlowMod;
 import org.openflow.protocol.OFMatch;
+import org.openflow.protocol.OFOXMFieldType;
 import org.openflow.protocol.OFPacketIn;
 import org.openflow.protocol.OFPacketOut;
 import org.openflow.protocol.OFPort;
@@ -127,25 +129,22 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule {
         // initialize match structure and populate it using the packet
         OFMatch match = new OFMatch();
         match.loadFromPacket(pi.getPacketData(), pi.getInPort());
-        if (decision.getWildcards() != null) {
-            match.setWildcards(decision.getWildcards());
+        if (decision.getNonWildcards() != null) {
+            match.setNonWildcards(decision.getNonWildcards());
         }
 
         // Create flow-mod based on packet-in and src-switch
         OFFlowMod fm =
                 (OFFlowMod) floodlightProvider.getOFMessageFactory()
                                               .getMessage(OFType.FLOW_MOD);
-        List<OFAction> actions = new ArrayList<OFAction>(); // Set no action to
-                                                            // drop
         long cookie = AppCookie.makeCookie(FORWARDING_APP_ID, 0);
 
+        //No instructions leads to drop
         fm.setCookie(cookie)
           .setHardTimeout((short) 0)
           .setIdleTimeout((short) 5)
           .setBufferId(OFPacketOut.BUFFER_ID_NONE)
-          .setMatch(match)
-          .setActions(actions)
-          .setLengthU(OFFlowMod.MINIMUM_LENGTH); // +OFActionOutput.MINIMUM_LENGTH);
+          .setMatch(match);
 
         try {
             if (log.isDebugEnabled()) {
@@ -247,9 +246,9 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule {
                     if (!srcDap.equals(dstDap)) {
                         Route route =
                                 routingEngine.getRoute(srcDap.getSwitchDPID(),
-                                                       (short)srcDap.getPort(),
+                                                       srcDap.getPort(),
                                                        dstDap.getSwitchDPID(),
-                                                       (short)dstDap.getPort(), 0); //cookie = 0, i.e., default route
+                                                       dstDap.getPort(), 0); //cookie = 0, i.e., default route
                         if (route != null) {
                             if (log.isTraceEnabled()) {
                                 log.trace("pushRoute match={} route={} " +
@@ -262,7 +261,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule {
                                     AppCookie.makeCookie(FORWARDING_APP_ID, 0);
 
                             // if there is prior routing decision use wildcard
-                            Integer wildcard_hints = null;
+                            EnumSet<OFOXMFieldType> nonWildcards = EnumSet.noneOf(OFOXMFieldType.class);
                             IRoutingDecision decision = null;
                             if (cntx != null) {
                                 decision = IRoutingDecision.rtStore
@@ -270,21 +269,16 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule {
                                                 IRoutingDecision.CONTEXT_DECISION);
                             }
                             if (decision != null) {
-                                wildcard_hints = decision.getWildcards();
+                                nonWildcards = decision.getNonWildcards();
                             } else {
                             	// L2 only wildcard if there is no prior route decision
-                                wildcard_hints = ((Integer) sw
-                                        .getAttribute(IOFSwitch.PROP_FASTWILDCARDS))
-                                        .intValue()
-                                        & ~OFMatch.OFPFW_IN_PORT
-                                        & ~OFMatch.OFPFW_DL_VLAN
-                                        & ~OFMatch.OFPFW_DL_SRC
-                                        & ~OFMatch.OFPFW_DL_DST
-                                        & ~OFMatch.OFPFW_NW_SRC_MASK
-                                        & ~OFMatch.OFPFW_NW_DST_MASK;
+                                nonWildcards = EnumSet.of(OFOXMFieldType.IN_PORT, OFOXMFieldType.VLAN_VID,
+                                		                     OFOXMFieldType.ETH_SRC, OFOXMFieldType.ETH_DST,
+                                		                     OFOXMFieldType.ETH_TYPE, //prereq
+                                		                     OFOXMFieldType.IPV4_SRC, OFOXMFieldType.IPV4_DST);
                             }
 
-                            pushRoute(route, match, wildcard_hints, pi, sw.getId(), cookie,
+                            pushRoute(route, match, nonWildcards, pi, sw.getId(), cookie,
                                       cntx, requestFlowRemovedNotifn, false,
                                       OFFlowMod.OFPFC_ADD);
                         }

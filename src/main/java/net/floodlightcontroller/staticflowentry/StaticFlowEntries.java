@@ -33,28 +33,25 @@ import net.floodlightcontroller.packet.IPv4;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.MappingJsonFactory;
+
 import org.openflow.protocol.OFFlowMod;
 import org.openflow.protocol.OFMatch;
+import org.openflow.protocol.OFOXMFieldType;
 import org.openflow.protocol.OFPacketOut;
 import org.openflow.protocol.OFPort;
+import org.openflow.protocol.OFGroup;
+import org.openflow.protocol.instruction.OFInstruction;
+import org.openflow.protocol.instruction.OFInstructionActions;
+import org.openflow.protocol.instruction.OFInstructionApplyActions;
 import org.openflow.protocol.action.OFAction;
-import org.openflow.protocol.action.OFActionDataLayerDestination;
-import org.openflow.protocol.action.OFActionDataLayerSource;
-import org.openflow.protocol.action.OFActionEnqueue;
-import org.openflow.protocol.action.OFActionNetworkLayerDestination;
-import org.openflow.protocol.action.OFActionNetworkLayerSource;
-import org.openflow.protocol.action.OFActionNetworkTypeOfService;
+import org.openflow.protocol.action.OFActionSetField;
+import org.openflow.protocol.action.OFActionSetQueue;
 import org.openflow.protocol.action.OFActionOutput;
-import org.openflow.protocol.action.OFActionStripVirtualLan;
-import org.openflow.protocol.action.OFActionTransportLayerDestination;
-import org.openflow.protocol.action.OFActionTransportLayerSource;
-import org.openflow.protocol.action.OFActionVirtualLanIdentifier;
-import org.openflow.protocol.action.OFActionVirtualLanPriorityCodePoint;
+import org.openflow.protocol.action.OFActionPopVLAN;
 import org.openflow.util.HexString;
 
 /**
@@ -64,11 +61,6 @@ import org.openflow.util.HexString;
 @LogMessageCategory("Static Flow Pusher")
 public class StaticFlowEntries {
     protected static Logger log = LoggerFactory.getLogger(StaticFlowEntries.class);
-    
-    private static class SubActionStruct {
-        OFAction action;
-        int      len;
-    }
     
     private static byte[] zeroMac = new byte[] {0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
     
@@ -99,9 +91,10 @@ public class StaticFlowEntries {
         fm.setIdleTimeout((short) 0);   // infinite
         fm.setHardTimeout((short) 0);   // infinite
         fm.setBufferId(OFPacketOut.BUFFER_ID_NONE);
-        fm.setCommand((short) 0);
+        fm.setCommand((byte) 0);
         fm.setFlags((short) 0);
-        fm.setOutPort(OFPort.OFPP_NONE.getValue());
+        fm.setOutPort(OFPort.OFPP_ANY.getValue());
+        fm.setOutGroup(OFGroup.OFPG_ANY.getValue());
         fm.setCookie(computeEntryCookie(fm, 0, entryName));  
         fm.setPriority(Short.MAX_VALUE);
     }
@@ -158,13 +151,17 @@ public class StaticFlowEntries {
         entry.put(StaticFlowEntryPusher.COLUMN_SWITCH, sw);
         entry.put(StaticFlowEntryPusher.COLUMN_ACTIVE, Boolean.toString(true));
         entry.put(StaticFlowEntryPusher.COLUMN_PRIORITY, Short.toString(fm.getPriority()));
-        entry.put(StaticFlowEntryPusher.COLUMN_WILDCARD, Integer.toString(match.getWildcards()));
         
-        if ((fm.getActions() != null) && (fm.getActions().size() > 0))
-        	entry.put(StaticFlowEntryPusher.COLUMN_ACTIONS, StaticFlowEntries.flowModActionsToString(fm.getActions()));
-        
-        if (match.getInputPort() != 0)
-        	entry.put(StaticFlowEntryPusher.COLUMN_IN_PORT, Short.toString(match.getInputPort()));
+        if ((fm.getInstructions() != null) && (fm.getInstructions().size() > 0)) {
+        	OFInstruction instruction = fm.getInstructions().get(0);
+        	if (instruction instanceof OFInstructionActions) {
+        		OFInstructionActions ia = (OFInstructionActions)instruction;
+	        	if ((ia.getActions() != null) && (ia.getActions().size() > 0))
+	        		entry.put(StaticFlowEntryPusher.COLUMN_ACTIONS, StaticFlowEntries.flowModActionsToString(ia.getActions()));
+        	}
+        }
+        if (match.getInPort() != 0)
+        	entry.put(StaticFlowEntryPusher.COLUMN_IN_PORT, Integer.toString(match.getInPort()));
         
         if (!Arrays.equals(match.getDataLayerSource(), zeroMac))
         	entry.put(StaticFlowEntryPusher.COLUMN_DL_SRC, HexString.toHexString(match.getDataLayerSource()));
@@ -219,51 +216,20 @@ public class StaticFlowEntries {
             }
             switch(a.getType()) {
                 case OUTPUT:
-                    sb.append("output=" + Short.toString(((OFActionOutput)a).getPort()));
+                    sb.append("output=" + Integer.toString(((OFActionOutput)a).getPort()));
                     break;
-                case OPAQUE_ENQUEUE:
-                    int queue = ((OFActionEnqueue)a).getQueueId();
-                    short port = ((OFActionEnqueue)a).getPort();
-                    sb.append("enqueue=" + Short.toString(port) + ":0x" + String.format("%02x", queue));
+                case SET_QUEUE:
+                    int queue = ((OFActionSetQueue)a).getQueueId();
+                    sb.append("set-queue=:0x" + String.format("%02x", queue));
                     break;
-                case STRIP_VLAN:
+                case POP_VLAN:
                     sb.append("strip-vlan");
                     break;
-                case SET_VLAN_ID:
-                    sb.append("set-vlan-id=" + 
-                        Short.toString(((OFActionVirtualLanIdentifier)a).getVirtualLanIdentifier()));
-                    break;
-                case SET_VLAN_PCP:
-                    sb.append("set-vlan-priority=" +
-                        Byte.toString(((OFActionVirtualLanPriorityCodePoint)a).getVirtualLanPriorityCodePoint()));
-                    break;
-                case SET_DL_SRC:
-                    sb.append("set-src-mac=" + 
-                        HexString.toHexString(((OFActionDataLayerSource)a).getDataLayerAddress()));
-                    break;
-                case SET_DL_DST:
-                    sb.append("set-dst-mac=" + 
-                        HexString.toHexString(((OFActionDataLayerDestination)a).getDataLayerAddress()));
-                    break;
-                case SET_NW_TOS:
-                    sb.append("set-tos-bits=" +
-                        Byte.toString(((OFActionNetworkTypeOfService)a).getNetworkTypeOfService()));
-                    break;
-                case SET_NW_SRC:
-                    sb.append("set-src-ip=" +
-                        IPv4.fromIPv4Address(((OFActionNetworkLayerSource)a).getNetworkAddress()));
-                    break;
-                case SET_NW_DST:
-                    sb.append("set-dst-ip=" +
-                        IPv4.fromIPv4Address(((OFActionNetworkLayerDestination)a).getNetworkAddress()));
-                    break;
-                case SET_TP_SRC:
-                    sb.append("set-src-port=" +
-                        Short.toString(((OFActionTransportLayerSource)a).getTransportPort()));
-                    break;
-                case SET_TP_DST:
-                    sb.append("set-dst-port=" +
-                        Short.toString(((OFActionTransportLayerDestination)a).getTransportPort()));
+                case SET_FIELD:
+                	//TODO: Support old style string names for fields
+                	OFActionSetField setField = (OFActionSetField)a;
+                	sb.append("set-" + setField.getField().getType().getName() + 
+                			"=" + setField.getField().getValue().toString());
                     break;
                 default:
                     log.error("Could not decode action: {}", a);
@@ -368,18 +334,18 @@ public class StaticFlowEntries {
             recommendation=LogMessageDoc.REPORT_CONTROLLER_BUG)
     public static void parseActionString(OFFlowMod flowMod, String actionstr, Logger log) {
         List<OFAction> actions = new LinkedList<OFAction>();
-        int actionsLength = 0;
+        List<OFInstruction> instructions = new LinkedList<OFInstruction>();
         if (actionstr != null) {
             actionstr = actionstr.toLowerCase();
             for (String subaction : actionstr.split(",")) {
                 String action = subaction.split("[=:]")[0];
-                SubActionStruct subaction_struct = null;
+                OFAction subaction_struct = null;
                 
                 if (action.equals("output")) {
-                    subaction_struct = StaticFlowEntries.decode_output(subaction, log);
+                    subaction_struct = decode_output(subaction, log);
                 }
-                else if (action.equals("enqueue")) {
-                    subaction_struct = decode_enqueue(subaction, log);
+                else if (action.equals("set-queue")) {
+                    subaction_struct = decode_set_queue(subaction, log);
                 }
                 else if (action.equals("strip-vlan")) {
                     subaction_struct = decode_strip_vlan(subaction, log);
@@ -405,40 +371,44 @@ public class StaticFlowEntries {
                 else if (action.equals("set-dst-ip")) {
                     subaction_struct = decode_set_dst_ip(subaction, log);
                 }
-                else if (action.equals("set-src-port")) {
-                    subaction_struct = decode_set_src_port(subaction, log);
+                /* In OF1.3, there is no action for generalized TP_SRC, TP_DST. 
+                 * It is specific to TCP, UDP, SCTP
+                 */
+                else if (action.equals("set-tcp-sport")) {
+                    subaction_struct = decode_set_tcp_sport(subaction, log);
                 }
-                else if (action.equals("set-dst-port")) {
-                    subaction_struct = decode_set_dst_port(subaction, log);
+                else if (action.equals("set-tcp-dport")) {
+                    subaction_struct = decode_set_tcp_dport(subaction, log);
+                }
+                else if (action.equals("set-udp-sport")) {
+                    subaction_struct = decode_set_udp_sport(subaction, log);
+                }
+                else if (action.equals("set-udp-dport")) {
+                    subaction_struct = decode_set_udp_dport(subaction, log);
                 }
                 else {
                     log.error("Unexpected action '{}', '{}'", action, subaction);
                 }
                 
                 if (subaction_struct != null) {
-                    actions.add(subaction_struct.action);
-                    actionsLength += subaction_struct.len;
+                    actions.add(subaction_struct);
                 }
             }
         }
         log.debug("action {}", actions);
-        flowMod.setActions(actions);
-        flowMod.setLengthU(OFFlowMod.MINIMUM_LENGTH + actionsLength);
+        instructions.add(new OFInstructionApplyActions().setActions(actions));
+        flowMod.setInstructions(instructions);
     } 
     
-    @LogMessageDoc(level="ERROR",
-            message="Invalid subaction: '{subaction}'",
-            explanation="A static flow entry contained an invalid subaction",
-            recommendation=LogMessageDoc.REPORT_CONTROLLER_BUG)
-    private static SubActionStruct decode_output(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_output(String subaction, Logger log) {
+    	OFActionOutput sa = null;
         Matcher n;
         
         n = Pattern.compile("output=(?:((?:0x)?\\d+)|(all)|(controller)|(local)|(ingress-port)|(normal)|(flood))").matcher(subaction);
         if (n.matches()) {
-            OFActionOutput action = new OFActionOutput();
-            action.setMaxLength(Short.MAX_VALUE);
-            short port = OFPort.OFPP_NONE.getValue();
+            sa = new OFActionOutput();
+            sa.setMaxLength(Short.MAX_VALUE);
+            int port = OFPort.OFPP_ANY.getValue();
             if (n.group(1) != null) {
                 try {
                     port = get_short(n.group(1));
@@ -460,12 +430,8 @@ public class StaticFlowEntries {
                 port = OFPort.OFPP_NORMAL.getValue();
             else if (n.group(7) != null)
                 port = OFPort.OFPP_FLOOD.getValue();
-            action.setPort(port);
-            log.debug("action {}", action);
-            
-            sa = new SubActionStruct();
-            sa.action = action;
-            sa.len = OFActionOutput.MINIMUM_LENGTH;
+            sa.setPort(port);
+            log.debug("action {}", sa);
         }
         else {
             log.error("Invalid subaction: '{}'", subaction);
@@ -475,27 +441,16 @@ public class StaticFlowEntries {
         return sa;
     }
     
-    private static SubActionStruct decode_enqueue(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_queue(String subaction, Logger log) {
+        OFAction sa = null;
         Matcher n;
         
-        n = Pattern.compile("enqueue=(?:((?:0x)?\\d+)\\:((?:0x)?\\d+))").matcher(subaction);
+        n = Pattern.compile("set-queue=(?:((?:0x)?\\d+)\\:((?:0x)?\\d+))").matcher(subaction);
         if (n.matches()) {
-            short portnum = 0;
+            int queueid = 0;
             if (n.group(1) != null) {
                 try {
-                    portnum = get_short(n.group(1));
-                }
-                catch (NumberFormatException e) {
-                    log.debug("Invalid port-num in: '{}' (error ignored)", subaction);
-                    return null;
-                }
-            }
-
-            int queueid = 0;
-            if (n.group(2) != null) {
-                try {
-                    queueid = get_int(n.group(2));
+                    queueid = get_int(n.group(1));
                 }
                 catch (NumberFormatException e) {
                     log.debug("Invalid queue-id in: '{}' (error ignored)", subaction);
@@ -503,14 +458,8 @@ public class StaticFlowEntries {
                }
             }
             
-            OFActionEnqueue action = new OFActionEnqueue();
-            action.setPort(portnum);
-            action.setQueueId(queueid);
-            log.debug("action {}", action);
-            
-            sa = new SubActionStruct();
-            sa.action = action;
-            sa.len = OFActionEnqueue.MINIMUM_LENGTH;
+            sa = new OFActionSetQueue().setQueueId(queueid);
+            log.debug("action {}", sa);
         }
         else {
             log.debug("Invalid action: '{}'", subaction);
@@ -520,17 +469,13 @@ public class StaticFlowEntries {
         return sa;
     }
     
-    private static SubActionStruct decode_strip_vlan(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_strip_vlan(String subaction, Logger log) {
+        OFAction sa = null;
         Matcher n = Pattern.compile("strip-vlan").matcher(subaction);
         
         if (n.matches()) {
-            OFActionStripVirtualLan action = new OFActionStripVirtualLan();
-            log.debug("action {}", action);
-            
-            sa = new SubActionStruct();
-            sa.action = action;
-            sa.len = OFActionStripVirtualLan.MINIMUM_LENGTH;
+            sa = new OFActionPopVLAN();
+            log.debug("action {}", sa);
         }
         else {
             log.debug("Invalid action: '{}'", subaction);
@@ -540,21 +485,16 @@ public class StaticFlowEntries {
         return sa;
     }
     
-    private static SubActionStruct decode_set_vlan_id(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_vlan_id(String subaction, Logger log) {
+        OFAction sa = null;
         Matcher n = Pattern.compile("set-vlan-id=((?:0x)?\\d+)").matcher(subaction);
         
         if (n.matches()) {            
             if (n.group(1) != null) {
                 try {
                     short vlanid = get_short(n.group(1));
-                    OFActionVirtualLanIdentifier action = new OFActionVirtualLanIdentifier();
-                    action.setVirtualLanIdentifier(vlanid);
-                    log.debug("  action {}", action);
-
-                    sa = new SubActionStruct();
-                    sa.action = action;
-                    sa.len = OFActionVirtualLanIdentifier.MINIMUM_LENGTH;
+                    sa = new OFActionSetField(OFOXMFieldType.VLAN_VID, vlanid);
+                    log.debug("action {}", sa);
                 }
                 catch (NumberFormatException e) {
                     log.debug("Invalid VLAN in: {} (error ignored)", subaction);
@@ -570,21 +510,16 @@ public class StaticFlowEntries {
         return sa;
     }
     
-    private static SubActionStruct decode_set_vlan_priority(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_vlan_priority(String subaction, Logger log) {
+        OFAction sa = null;
         Matcher n = Pattern.compile("set-vlan-priority=((?:0x)?\\d+)").matcher(subaction); 
         
-        if (n.matches()) {            
+        if (n.matches()) {
             if (n.group(1) != null) {
                 try {
                     byte prior = get_byte(n.group(1));
-                    OFActionVirtualLanPriorityCodePoint action = new OFActionVirtualLanPriorityCodePoint();
-                    action.setVirtualLanPriorityCodePoint(prior);
-                    log.debug("  action {}", action);
-                    
-                    sa = new SubActionStruct();
-                    sa.action = action;
-                    sa.len = OFActionVirtualLanPriorityCodePoint.MINIMUM_LENGTH;
+                    sa = new OFActionSetField(OFOXMFieldType.ETH_SRC, prior);
+                    log.debug("  action {}", sa);
                 }
                 catch (NumberFormatException e) {
                     log.debug("Invalid VLAN priority in: {} (error ignored)", subaction);
@@ -600,21 +535,16 @@ public class StaticFlowEntries {
         return sa;
     }
     
-    private static SubActionStruct decode_set_src_mac(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_src_mac(String subaction, Logger log) {
+    	OFActionSetField sa = null;
         Matcher n = Pattern.compile("set-src-mac=(?:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+))").matcher(subaction); 
 
         if (n.matches()) {
             byte[] macaddr = get_mac_addr(n, subaction, log);
             if (macaddr != null) {
-                OFActionDataLayerSource action = new OFActionDataLayerSource();
-                action.setDataLayerAddress(macaddr);
-                log.debug("action {}", action);
-
-                sa = new SubActionStruct();
-                sa.action = action;
-                sa.len = OFActionDataLayerSource.MINIMUM_LENGTH;
-            }            
+                sa = new OFActionSetField(OFOXMFieldType.ETH_SRC, macaddr);
+                log.debug("action {}", sa);
+            }
         }
         else {
             log.debug("Invalid action: '{}'", subaction);
@@ -624,20 +554,15 @@ public class StaticFlowEntries {
         return sa;
     }
 
-    private static SubActionStruct decode_set_dst_mac(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_dst_mac(String subaction, Logger log) {
+        OFActionSetField sa = null;
         Matcher n = Pattern.compile("set-dst-mac=(?:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+))").matcher(subaction);
         
         if (n.matches()) {
-            byte[] macaddr = get_mac_addr(n, subaction, log);            
+            byte[] macaddr = get_mac_addr(n, subaction, log);
             if (macaddr != null) {
-                OFActionDataLayerDestination action = new OFActionDataLayerDestination();
-                action.setDataLayerAddress(macaddr);
-                log.debug("  action {}", action);
-                
-                sa = new SubActionStruct();
-                sa.action = action;
-                sa.len = OFActionDataLayerDestination.MINIMUM_LENGTH;
+                sa = new OFActionSetField(OFOXMFieldType.ETH_DST, macaddr);
+                log.debug("  action {}", sa);
             }
         }
         else {
@@ -648,21 +573,16 @@ public class StaticFlowEntries {
         return sa;
     }
     
-    private static SubActionStruct decode_set_tos_bits(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_tos_bits(String subaction, Logger log) {
+    	OFActionSetField sa = null;
         Matcher n = Pattern.compile("set-tos-bits=((?:0x)?\\d+)").matcher(subaction); 
 
         if (n.matches()) {
             if (n.group(1) != null) {
                 try {
                     byte tosbits = get_byte(n.group(1));
-                    OFActionNetworkTypeOfService action = new OFActionNetworkTypeOfService();
-                    action.setNetworkTypeOfService(tosbits);
-                    log.debug("  action {}", action);
-                    
-                    sa = new SubActionStruct();
-                    sa.action = action;
-                    sa.len = OFActionNetworkTypeOfService.MINIMUM_LENGTH;
+                    sa = new OFActionSetField(OFOXMFieldType.IP_DSCP, tosbits);
+                    log.debug("action {}", sa);
                 }
                 catch (NumberFormatException e) {
                     log.debug("Invalid dst-port in: {} (error ignored)", subaction);
@@ -678,19 +598,14 @@ public class StaticFlowEntries {
         return sa;
     }
     
-    private static SubActionStruct decode_set_src_ip(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_src_ip(String subaction, Logger log) {
+    	OFActionSetField sa = null;
         Matcher n = Pattern.compile("set-src-ip=(?:(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+))").matcher(subaction);
 
         if (n.matches()) {
             int ipaddr = get_ip_addr(n, subaction, log);
-            OFActionNetworkLayerSource action = new OFActionNetworkLayerSource();
-            action.setNetworkAddress(ipaddr);
-            log.debug("  action {}", action);
-
-            sa = new SubActionStruct();
-            sa.action = action;
-            sa.len = OFActionNetworkLayerSource.MINIMUM_LENGTH;
+            sa = new OFActionSetField(OFOXMFieldType.IPV4_SRC, ipaddr);
+            log.debug("action {}", sa);
         }
         else {
             log.debug("Invalid action: '{}'", subaction);
@@ -700,19 +615,14 @@ public class StaticFlowEntries {
         return sa;
     }
 
-    private static SubActionStruct decode_set_dst_ip(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_dst_ip(String subaction, Logger log) {
+        OFActionSetField sa = null;
         Matcher n = Pattern.compile("set-dst-ip=(?:(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+))").matcher(subaction);
 
         if (n.matches()) {
             int ipaddr = get_ip_addr(n, subaction, log);
-            OFActionNetworkLayerDestination action = new OFActionNetworkLayerDestination();
-            action.setNetworkAddress(ipaddr);
-            log.debug("action {}", action);
- 
-            sa = new SubActionStruct();
-            sa.action = action;
-            sa.len = OFActionNetworkLayerDestination.MINIMUM_LENGTH;
+            sa = new OFActionSetField(OFOXMFieldType.IPV4_DST, ipaddr);
+            log.debug("action {}", sa);
         }
         else {
             log.debug("Invalid action: '{}'", subaction);
@@ -722,24 +632,19 @@ public class StaticFlowEntries {
         return sa;
     }
 
-    private static SubActionStruct decode_set_src_port(String subaction, Logger log) {
-        SubActionStruct sa = null;
-        Matcher n = Pattern.compile("set-src-port=((?:0x)?\\d+)").matcher(subaction); 
+    private static OFAction decode_set_tcp_sport(String subaction, Logger log) {
+        OFActionSetField sa = null;
+        Matcher n = Pattern.compile("set-tcp-sport=((?:0x)?\\d+)").matcher(subaction); 
 
         if (n.matches()) {
             if (n.group(1) != null) {
                 try {
-                    short portnum = get_short(n.group(1));
-                    OFActionTransportLayerSource action = new OFActionTransportLayerSource();
-                    action.setTransportPort(portnum);
-                    log.debug("action {}", action);
-                    
-                    sa = new SubActionStruct();
-                    sa.action = action;
-                    sa.len = OFActionTransportLayerSource.MINIMUM_LENGTH;;
+                    int portnum = get_short(n.group(1));
+                    sa = new OFActionSetField(OFOXMFieldType.TCP_SRC, portnum);
+                    log.debug("action {}", sa);
                 }
                 catch (NumberFormatException e) {
-                    log.debug("Invalid src-port in: {} (error ignored)", subaction);
+                    log.debug("Invalid tcp-sport in: {} (error ignored)", subaction);
                     return null;
                 }
             }
@@ -752,24 +657,69 @@ public class StaticFlowEntries {
         return sa;
     }
 
-    private static SubActionStruct decode_set_dst_port(String subaction, Logger log) {
-        SubActionStruct sa = null;
-        Matcher n = Pattern.compile("set-dst-port=((?:0x)?\\d+)").matcher(subaction);
+    private static OFAction decode_set_tcp_dport(String subaction, Logger log) {
+        OFActionSetField sa = null;
+        Matcher n = Pattern.compile("set-tcp-dport=((?:0x)?\\d+)").matcher(subaction); 
 
         if (n.matches()) {
             if (n.group(1) != null) {
                 try {
-                    short portnum = get_short(n.group(1));
-                    OFActionTransportLayerDestination action = new OFActionTransportLayerDestination();
-                    action.setTransportPort(portnum);
-                    log.debug("action {}", action);
-                    
-                    sa = new SubActionStruct();
-                    sa.action = action;
-                    sa.len = OFActionTransportLayerDestination.MINIMUM_LENGTH;;
+                    int portnum = get_short(n.group(1));
+                    sa = new OFActionSetField(OFOXMFieldType.TCP_DST, portnum);
+                    log.debug("action {}", sa);
                 }
                 catch (NumberFormatException e) {
-                    log.debug("Invalid dst-port in: {} (error ignored)", subaction);
+                    log.debug("Invalid tcp-sport in: {} (error ignored)", subaction);
+                    return null;
+                }
+            }
+        }
+        else {
+            log.debug("Invalid action: '{}'", subaction);
+            return null;
+        }
+
+        return sa;
+    }
+
+    private static OFAction decode_set_udp_sport(String subaction, Logger log) {
+        OFActionSetField sa = null;
+        Matcher n = Pattern.compile("set-udp-sport=((?:0x)?\\d+)").matcher(subaction); 
+
+        if (n.matches()) {
+            if (n.group(1) != null) {
+                try {
+                    int portnum = get_short(n.group(1));
+                    sa = new OFActionSetField(OFOXMFieldType.UDP_SRC, portnum);
+                    log.debug("action {}", sa);
+                }
+                catch (NumberFormatException e) {
+                    log.debug("Invalid udp-sport in: {} (error ignored)", subaction);
+                    return null;
+                }
+            }
+        }
+        else {
+            log.debug("Invalid action: '{}'", subaction);
+            return null;
+        }
+
+        return sa;
+    }
+
+    private static OFAction decode_set_udp_dport(String subaction, Logger log) {
+        OFActionSetField sa = null;
+        Matcher n = Pattern.compile("set-udp-dport=((?:0x)?\\d+)").matcher(subaction); 
+
+        if (n.matches()) {
+            if (n.group(1) != null) {
+                try {
+                    int portnum = get_short(n.group(1));
+                    sa = new OFActionSetField(OFOXMFieldType.UDP_DST, portnum);
+                    log.debug("action {}", sa);
+                }
+                catch (NumberFormatException e) {
+                    log.debug("Invalid tcp-sport in: {} (error ignored)", subaction);
                     return null;
                 }
             }

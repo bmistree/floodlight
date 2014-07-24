@@ -39,6 +39,7 @@ import org.easymock.Capture;
 import org.easymock.CaptureType;
 import org.junit.Before;
 import org.junit.Test;
+import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFPacketIn;
 import org.openflow.protocol.OFPacketIn.OFPacketInReason;
 import org.openflow.protocol.OFMessage;
@@ -87,7 +88,7 @@ public class HubTest extends FloodlightTestCase {
         // Build the PacketIn
         this.packetIn = ((OFPacketIn) mockFloodlightProvider.getOFMessageFactory().getMessage(OFType.PACKET_IN))
             .setBufferId(-1)
-            .setInPort((short) 1)
+            .setMatch(new OFMatch().setInPort(1))
             .setPacketData(this.testPacketSerialized)
             .setReason(OFPacketInReason.NO_MATCH)
             .setTotalLength((short) this.testPacketSerialized.length);
@@ -100,7 +101,7 @@ public class HubTest extends FloodlightTestCase {
             .setActions(Arrays.asList(new OFAction[] {new OFActionOutput().setPort(OFPort.OFPP_FLOOD.getValue())}))
             .setActionsLength((short) OFActionOutput.MINIMUM_LENGTH)
             .setBufferId(-1)
-            .setInPort((short) 1)
+            .setMatch(new OFMatch().setInPort(1))
             .setPacketData(this.testPacketSerialized);
         po.setLengthU(OFPacketOut.MINIMUM_LENGTH + po.getActionsLengthU()
                 + this.testPacketSerialized.length);
@@ -139,7 +140,7 @@ public class HubTest extends FloodlightTestCase {
             .setActions(Arrays.asList(new OFAction[] {new OFActionOutput().setPort(OFPort.OFPP_FLOOD.getValue())}))
             .setActionsLength((short) OFActionOutput.MINIMUM_LENGTH)
             .setBufferId(10)
-            .setInPort((short) 1);
+            .setMatch(new OFMatch().setInPort(1));
         po.setLengthU(OFPacketOut.MINIMUM_LENGTH + po.getActionsLengthU());
 
         // Mock up our expected behavior

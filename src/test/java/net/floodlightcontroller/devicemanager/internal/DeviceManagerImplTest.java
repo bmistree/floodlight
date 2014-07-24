@@ -90,6 +90,7 @@ import net.floodlightcontroller.topology.ITopologyService;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
+import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFPacketIn;
 import org.openflow.protocol.OFPacketIn.OFPacketInReason;
 import org.openflow.protocol.OFPort;
@@ -282,7 +283,7 @@ public class DeviceManagerImplTest extends FloodlightTestCase {
         this.testARPReplyPacketIn_1 = ((OFPacketIn) mockFloodlightProvider.
                 getOFMessageFactory().getMessage(OFType.PACKET_IN))
                 .setBufferId(-1)
-                .setInPort((short) 1)
+                .setMatch(new OFMatch().setInPort(1))
                 .setPacketData(this.testARPReplyPacket_1_Srld)
                 .setReason(OFPacketInReason.NO_MATCH)
                 .setTotalLength((short) this.testARPReplyPacket_1_Srld.length);
@@ -291,7 +292,7 @@ public class DeviceManagerImplTest extends FloodlightTestCase {
         this.testARPReplyPacketIn_2 = ((OFPacketIn) mockFloodlightProvider.
                 getOFMessageFactory().getMessage(OFType.PACKET_IN))
                 .setBufferId(-1)
-                .setInPort((short) 1)
+                .setMatch(new OFMatch().setInPort(1))
                 .setPacketData(this.testARPReplyPacket_2_Srld)
                 .setReason(OFPacketInReason.NO_MATCH)
                 .setTotalLength((short) this.testARPReplyPacket_2_Srld.length);
@@ -309,7 +310,7 @@ public class DeviceManagerImplTest extends FloodlightTestCase {
         this.testUDPPacketIn = ((OFPacketIn) mockFloodlightProvider.
                 getOFMessageFactory().getMessage(OFType.PACKET_IN))
                 .setBufferId(-1)
-                .setInPort((short) 3)
+                .setMatch(new OFMatch().setInPort(3))
                 .setPacketData(this.testUDPPacketSrld)
                 .setReason(OFPacketInReason.NO_MATCH)
                 .setTotalLength((short) this.testUDPPacketSrld.length);
@@ -1246,7 +1247,7 @@ public class DeviceManagerImplTest extends FloodlightTestCase {
 
         // trigger the packet in
         cntx = new FloodlightContext();
-        packetIn.setInPort((short)2);
+        packetIn.setMatch(new OFMatch().setInPort(2));
         cmd = dispatchPacketIn(5L, packetIn, cntx);
         verify(mockTopology);
         // Verify the replay matched our expectations

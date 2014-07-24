@@ -73,6 +73,7 @@ import org.openflow.protocol.OFPort;
 import org.openflow.protocol.OFStatisticsReply;
 import org.openflow.protocol.OFStatisticsRequest;
 import org.openflow.protocol.OFType;
+import org.openflow.protocol.statistics.OFPortDescription;
 import org.openflow.protocol.statistics.OFDescriptionStatistics;
 import org.openflow.protocol.statistics.OFStatistics;
 import org.openflow.protocol.statistics.OFStatisticsType;
@@ -121,7 +122,7 @@ public abstract class OFSwitchBase implements IOFSwitch {
     private volatile boolean connected;
     private volatile Role role;
     private final TimedCache<Long> timedCache;
-    private final ConcurrentMap<Short, AtomicLong> portBroadcastCacheHitMap;
+    private final ConcurrentMap<Integer, AtomicLong> portBroadcastCacheHitMap;
 
     private final PortManager portManager;
 
@@ -140,8 +141,8 @@ public abstract class OFSwitchBase implements IOFSwitch {
     private TimedCache<OFMatch> ofMatchCache;
     private TimedCache<Long> macCache;
     private TimedCache<Long> macBlockedCache;
-    private TimedCache<Short> portCache;
-    private TimedCache<Short> portBlockedCache;
+    private TimedCache<Integer> portCache;
+    private TimedCache<Integer> portBlockedCache;
     private boolean flowTableFull = false;
 
     protected OFDescriptionStatistics description;
@@ -178,14 +179,13 @@ public abstract class OFSwitchBase implements IOFSwitch {
         this.iofMsgListenersMap = new ConcurrentHashMap<Integer,IOFMessageListener>();
         this.role = null;
         this.timedCache = new TimedCache<Long>(100, 5*1000 );  // 5 seconds interval
-        this.portBroadcastCacheHitMap = new ConcurrentHashMap<Short, AtomicLong>();
+        this.portBroadcastCacheHitMap = new ConcurrentHashMap<Integer, AtomicLong>();
         this.description = new OFDescriptionStatistics();
         this.lastMessageTime = System.currentTimeMillis();
 
         this.portManager = new PortManager();
 
         // Defaults properties for an ideal switch
-        this.setAttribute(PROP_FASTWILDCARDS, OFMatch.OFPFW_ALL);
         this.setAttribute(PROP_SUPPORTS_OFPP_FLOOD, Boolean.valueOf(true));
         this.setAttribute(PROP_SUPPORTS_OFPP_TABLE, Boolean.valueOf(true));
         if (packetInRateThresholdHigh == 0) {
@@ -226,8 +226,8 @@ public abstract class OFSwitchBase implements IOFSwitch {
         private final ReentrantReadWriteLock lock;
         private List<ImmutablePort> portList;
         private List<ImmutablePort> enabledPortList;
-        private List<Short> enabledPortNumbers;
-        private Map<Short,ImmutablePort> portsByNumber;
+        private List<Integer> enabledPortNumbers;
+        private Map<Integer,ImmutablePort> portsByNumber;
         private Map<String,ImmutablePort> portsByName;
 
 
@@ -253,7 +253,7 @@ public abstract class OFSwitchBase implements IOFSwitch {
          * writelock
          */
         private void updatePortsWithNewPortsByNumber(
-                Map<Short,ImmutablePort> newPortsByNumber) {
+                Map<Integer,ImmutablePort> newPortsByNumber) {
             if (!lock.writeLock().isHeldByCurrentThread()) {
                 throw new IllegalStateException("Method called without " +
                                                 "holding writeLock");
@@ -264,7 +264,7 @@ public abstract class OFSwitchBase implements IOFSwitch {
                     new ArrayList<ImmutablePort>();
             List<ImmutablePort> newEnabledPortList =
                     new ArrayList<ImmutablePort>();
-            List<Short> newEnabledPortNumbers = new ArrayList<Short>();
+            List<Integer> newEnabledPortNumbers = new ArrayList<Integer>();
 
             for(ImmutablePort p: newPortsByNumber.values()) {
                 newPortList.add(p);
@@ -305,8 +305,8 @@ public abstract class OFSwitchBase implements IOFSwitch {
             OrderedCollection<PortChangeEvent> events =
                     new LinkedHashSetWrapper<PortChangeEvent>();
             try {
-                Map<Short,ImmutablePort> newPortByNumber =
-                        new HashMap<Short, ImmutablePort>(portsByNumber);
+                Map<Integer,ImmutablePort> newPortByNumber =
+                        new HashMap<Integer, ImmutablePort>(portsByNumber);
                 ImmutablePort prevPort =
                         portsByNumber.get(delPort.getPortNumber());
                 if (prevPort == null) {
@@ -362,7 +362,7 @@ public abstract class OFSwitchBase implements IOFSwitch {
             try {
                 ImmutablePort port =
                         ImmutablePort.fromOFPhysicalPort(ps.getDesc());
-                OFPortReason reason = OFPortReason.fromReasonCode(ps.getReason());
+                OFPortReason reason = OFPortReason.values()[ps.getReason()];
                 if (reason == null) {
                     throw new IllegalArgumentException("Unknown PortStatus " +
                             "reason code " + ps.getReason());
@@ -380,8 +380,8 @@ public abstract class OFSwitchBase implements IOFSwitch {
                 // doesn't specify what uniquely identifies a port the
                 // notion of ADD vs. MODIFY can also be hazy. So we just
                 // compare the new port to the existing ones.
-                Map<Short,ImmutablePort> newPortByNumber =
-                    new HashMap<Short, ImmutablePort>(portsByNumber);
+                Map<Integer,ImmutablePort> newPortByNumber =
+                    new HashMap<Integer, ImmutablePort>(portsByNumber);
                 OrderedCollection<PortChangeEvent> events = getSinglePortChanges(port);
                 for (PortChangeEvent e: events) {
                     switch(e.type) {
@@ -550,14 +550,14 @@ public abstract class OFSwitchBase implements IOFSwitch {
                 OrderedCollection<PortChangeEvent> events =
                         new LinkedHashSetWrapper<PortChangeEvent>();
 
-                Map<Short,ImmutablePort> newPortsByNumber =
-                        new HashMap<Short, ImmutablePort>();
+                Map<Integer,ImmutablePort> newPortsByNumber =
+                        new HashMap<Integer, ImmutablePort>();
                 Map<String,ImmutablePort> newPortsByName =
                         new HashMap<String, ImmutablePort>();
                 List<ImmutablePort> newEnabledPortList =
                         new ArrayList<ImmutablePort>();
-                List<Short> newEnabledPortNumbers =
-                        new ArrayList<Short>();
+                List<Integer> newEnabledPortNumbers =
+                        new ArrayList<Integer>();
                 List<ImmutablePort> newPortsList =
                         new ArrayList<ImmutablePort>(newPorts);
 
@@ -638,7 +638,7 @@ public abstract class OFSwitchBase implements IOFSwitch {
             }
         }
 
-        public ImmutablePort getPort(Short portNumber) {
+        public ImmutablePort getPort(Integer portNumber) {
             lock.readLock().lock();
             try {
                 return portsByNumber.get(portNumber);
@@ -665,7 +665,7 @@ public abstract class OFSwitchBase implements IOFSwitch {
             }
         }
 
-        public List<Short> getEnabledPortNumbers() {
+        public List<Integer> getEnabledPortNumbers() {
             lock.readLock().lock();
             try {
                 return enabledPortNumbers;
@@ -837,21 +837,25 @@ public abstract class OFSwitchBase implements IOFSwitch {
     @Override
     @JsonIgnore
     public void setFeaturesReply(OFFeaturesReply featuresReply) {
-        if (stringId == null) {
-            /* ports are updated via port status message, so we
-             * only fill in ports on initial connection.
-             */
-            List<ImmutablePort> immutablePorts = ImmutablePort
-                    .immutablePortListOf(featuresReply.getPorts());
-            portManager.updatePorts(immutablePorts);
-        }
         this.datapathId = featuresReply.getDatapathId();
         this.stringId = HexString.toHexString(featuresReply.getDatapathId());
         this.capabilities = featuresReply.getCapabilities();
         this.buffers = featuresReply.getBuffers();
         this.actions = featuresReply.getActions();
         this.tables = featuresReply.getTables();
-}
+    }
+
+    @Override
+    @JsonIgnore
+    public void setPortDescriptions(List<OFPortDescription> portDescriptions) {
+    	/* This method is called only in the first channel handling.
+		 * Ports are later updated via port status message, so we
+		 * only fill in ports on initial connection.
+		 */
+       List<ImmutablePort> immutablePorts = ImmutablePort
+               .immutablePortListOf(portDescriptions);
+       portManager.updatePorts(immutablePorts);
+    }
 
     @Override
     @JsonIgnore
@@ -861,12 +865,12 @@ public abstract class OFSwitchBase implements IOFSwitch {
 
     @Override
     @JsonIgnore
-    public Collection<Short> getEnabledPortNumbers() {
+    public Collection<Integer> getEnabledPortNumbers() {
         return portManager.getEnabledPortNumbers();
     }
 
     @Override
-    public ImmutablePort getPort(short portNumber) {
+    public ImmutablePort getPort(int portNumber) {
         return portManager.getPort(portNumber);
     }
 
@@ -902,7 +906,7 @@ public abstract class OFSwitchBase implements IOFSwitch {
     }
 
     @Override
-    public boolean portEnabled(short portNumber) {
+    public boolean portEnabled(int portNumber) {
         ImmutablePort p = portManager.getPort(portNumber);
         if (p == null) return false;
         return p.isEnabled();
@@ -1005,16 +1009,19 @@ public abstract class OFSwitchBase implements IOFSwitch {
             message="Switch {switch} flow table capacity back to normal",
             explanation="The switch flow table is less than 90% full")
     })
+    
     private void checkForTableStats(OFStatisticsReply statReply) {
-        if (statReply.getStatisticType() != OFStatisticsType.TABLE) {
+        if (statReply.getStatisticsType() != OFStatisticsType.TABLE) {
             return;
         }
         List<? extends OFStatistics> stats = statReply.getStatistics();
+        // TODO: Support multiple tables
         // Assume a single table only
         OFStatistics stat = stats.get(0);
         if (stat instanceof OFTableStatistics) {
             OFTableStatistics tableStat = (OFTableStatistics) stat;
             int activeCount = tableStat.getActiveCount();
+            /* TODO: Query switch for maximum entries of table
             int maxEntry = tableStat.getMaximumEntries();
             log.debug("Switch {} active entries {} max entries {}",
                     new Object[] { this.stringId, activeCount, maxEntry});
@@ -1028,7 +1035,7 @@ public abstract class OFSwitchBase implements IOFSwitch {
                 log.info("Switch {} flow table is almost full", toString());
                 floodlightProvider.addSwitchEvent(this.datapathId,
                         "SWITCH_FLOW_TABLE_ALMOST_FULL >= 98% full", false);
-            }
+            } */   
         }
     }
 
@@ -1122,12 +1129,12 @@ public abstract class OFSwitchBase implements IOFSwitch {
             return;
         // Delete all pre-existing flows
         log.info("Clearing all flows on switch {}", this);
-        OFMatch match = new OFMatch().setWildcards(OFMatch.OFPFW_ALL);
+        OFMatch match = new OFMatch();
         OFMessage fm = ((OFFlowMod) floodlightProvider.getOFMessageFactory()
             .getMessage(OFType.FLOW_MOD))
                 .setMatch(match)
             .setCommand(OFFlowMod.OFPFC_DELETE)
-            .setOutPort(OFPort.OFPP_NONE)
+            .setOutPort(OFPort.OFPP_ANY)
             .setLength(U16.t(OFFlowMod.MINIMUM_LENGTH));
         fm.setXid(getNextTransactionId());
         OFMessage barrierMsg = floodlightProvider.getOFMessageFactory().getMessage(
@@ -1140,7 +1147,7 @@ public abstract class OFSwitchBase implements IOFSwitch {
     }
 
     @Override
-    public boolean updateBroadcastCache(Long entry, Short port) {
+    public boolean updateBroadcastCache(Long entry, Integer port) {
         if (timedCache.update(entry)) {
             AtomicLong count = portBroadcastCacheHitMap.get(port);
             if(count == null) {
@@ -1161,9 +1168,9 @@ public abstract class OFSwitchBase implements IOFSwitch {
 
     @Override
     @JsonIgnore
-    public Map<Short, Long> getPortBroadcastHits() {
-        Map<Short, Long> res = new HashMap<Short, Long>();
-        for (Map.Entry<Short, AtomicLong> entry : portBroadcastCacheHitMap.entrySet()) {
+    public Map<Integer, Long> getPortBroadcastHits() {
+        Map<Integer, Long> res = new HashMap<Integer, Long>();
+        for (Map.Entry<Integer, AtomicLong> entry : portBroadcastCacheHitMap.entrySet()) {
             res.put(entry.getKey(), entry.getValue().get());
         }
         return res;
@@ -1401,8 +1408,8 @@ public abstract class OFSwitchBase implements IOFSwitch {
         ofMatchCache = new TimedCache<OFMatch>(2048, 5000); // 5 second interval
         macCache = new TimedCache<Long>(64, 1000 );  // remember last second
         macBlockedCache = new TimedCache<Long>(256, 5000 );  // 5 second interval
-        portCache = new TimedCache<Short>(16, 1000 );  // rememeber last second
-        portBlockedCache = new TimedCache<Short>(64, 5000 );  // 5 second interval
+        portCache = new TimedCache<Integer>(16, 1000 );  // rememeber last second
+        portBlockedCache = new TimedCache<Integer>(64, 5000 );  // 5 second interval
         packetInThrottleEnabled = true;
         messageCountUniqueOFMatch = 0;
         floodlightProvider.addSwitchEvent(this.datapathId,
@@ -1494,7 +1501,7 @@ public abstract class OFSwitchBase implements IOFSwitch {
      * @return
      */
     private void checkPerPortRate(OFPacketIn pin) {
-        Short port = pin.getInPort();
+        Integer port = pin.getInPort();
         if (portCache.update(port)) {
             // Check if we already pushed a flow in the last 5 seconds
             if (portBlockedCache.update(port)) {

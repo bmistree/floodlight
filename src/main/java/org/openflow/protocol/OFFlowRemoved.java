@@ -1,47 +1,34 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
+import java.nio.ByteBuffer;
 
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.util.U16;
 
 /**
  * Represents an ofp_flow_removed message
  * @author David Erickson (daviderickson@cs.stanford.edu)
+ * @author Srini Seetharaman (srini.seetharaman@gmail.com)
  *
  */
 public class OFFlowRemoved extends OFMessage {
-    public static int MINIMUM_LENGTH = 88;
+    public static int MINIMUM_LENGTH = 56;
 
     public enum OFFlowRemovedReason {
         OFPRR_IDLE_TIMEOUT,
         OFPRR_HARD_TIMEOUT,
-        OFPRR_DELETE
+        OFPRR_DELETE,
+        OFPRR_GROUP_DELETE
     }
 
     protected OFMatch match;
     protected long cookie;
     protected short priority;
     protected OFFlowRemovedReason reason;
+    protected byte tableId;
     protected int durationSeconds;
     protected int durationNanoseconds;
     protected short idleTimeout;
+    protected short hardTimeout;
     protected long packetCount;
     protected long byteCount;
     
@@ -63,8 +50,9 @@ public class OFFlowRemoved extends OFMessage {
      * Set cookie
      * @param cookie
      */
-    public void setCookie(long cookie) {
+    public OFFlowRemoved setCookie(long cookie) {
         this.cookie = cookie;
+        return this;
     }
 
     /**
@@ -79,8 +67,26 @@ public class OFFlowRemoved extends OFMessage {
      * Set idle_timeout
      * @param idleTimeout
      */
-    public void setIdleTimeout(short idleTimeout) {
+    public OFFlowRemoved setIdleTimeout(short idleTimeout) {
         this.idleTimeout = idleTimeout;
+        return this;
+    }
+
+    /**
+     * Get hard_timeout
+     * @return
+     */
+    public short getHardTimeout() {
+        return this.hardTimeout;
+    }
+
+    /**
+     * Set hard_timeout
+     * @param hardTimeout
+     */
+    public OFFlowRemoved setHardTimeout(short hardTimeout) {
+        this.hardTimeout = hardTimeout;
+        return this;
     }
 
     /**
@@ -96,8 +102,9 @@ public class OFFlowRemoved extends OFMessage {
      * Set match
      * @param match
      */
-    public void setMatch(OFMatch match) {
+    public OFFlowRemoved setMatch(OFMatch match) {
         this.match = match;
+        return this;
     }
 
     /**
@@ -112,8 +119,9 @@ public class OFFlowRemoved extends OFMessage {
      * Set priority
      * @param priority
      */
-    public void setPriority(short priority) {
+    public OFFlowRemoved setPriority(short priority) {
         this.priority = priority;
+        return this;
     }
 
     /**
@@ -126,8 +134,26 @@ public class OFFlowRemoved extends OFMessage {
     /**
      * @param reason the reason to set
      */
-    public void setReason(OFFlowRemovedReason reason) {
+    public OFFlowRemoved setReason(OFFlowRemovedReason reason) {
         this.reason = reason;
+        return this;
+    }
+
+    /**
+     * Get tableId
+     * @return
+     */
+    public byte getTableId() {
+        return this.tableId;
+    }
+
+    /**
+     * Set tableId
+     * @param tableId
+     */
+    public OFFlowRemoved setTableId(byte tableId) {
+        this.tableId = tableId;
+        return this;
     }
 
     /**
@@ -140,8 +166,9 @@ public class OFFlowRemoved extends OFMessage {
     /**
      * @param durationSeconds the durationSeconds to set
      */
-    public void setDurationSeconds(int durationSeconds) {
+    public OFFlowRemoved setDurationSeconds(int durationSeconds) {
         this.durationSeconds = durationSeconds;
+        return this;
     }
 
     /**
@@ -154,8 +181,9 @@ public class OFFlowRemoved extends OFMessage {
     /**
      * @param durationNanoseconds the durationNanoseconds to set
      */
-    public void setDurationNanoseconds(int durationNanoseconds) {
+    public OFFlowRemoved setDurationNanoseconds(int durationNanoseconds) {
         this.durationNanoseconds = durationNanoseconds;
+        return this;
     }
 
     /**
@@ -168,8 +196,9 @@ public class OFFlowRemoved extends OFMessage {
     /**
      * @param packetCount the packetCount to set
      */
-    public void setPacketCount(long packetCount) {
+    public OFFlowRemoved setPacketCount(long packetCount) {
         this.packetCount = packetCount;
+        return this;
     }
 
     /**
@@ -182,48 +211,43 @@ public class OFFlowRemoved extends OFMessage {
     /**
      * @param byteCount the byteCount to set
      */
-    public void setByteCount(long byteCount) {
+    public OFFlowRemoved setByteCount(long byteCount) {
         this.byteCount = byteCount;
+        return this;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
+        this.cookie = data.getLong();
+        this.priority = data.getShort();
+        this.reason = OFFlowRemovedReason.values()[(0xff & data.get())];
+        this.tableId = data.get();
+        this.durationSeconds = data.getInt();
+        this.durationNanoseconds = data.getInt();
+        this.idleTimeout = data.getShort();
+        this.hardTimeout = data.getShort();
+        this.packetCount = data.getLong();
+        this.byteCount = data.getLong();
         if (this.match == null)
             this.match = new OFMatch();
         this.match.readFrom(data);
-        this.cookie = data.readLong();
-        this.priority = data.readShort();
-        int reasonIndex = 0xff & data.readByte();
-        if (reasonIndex >= OFFlowRemovedReason.values().length) {
-            reasonIndex = OFFlowRemovedReason.values().length - 1;
-        }
-        this.reason = OFFlowRemovedReason.values()[reasonIndex];
-        data.readByte(); // pad
-        this.durationSeconds = data.readInt();
-        this.durationNanoseconds = data.readInt();
-        this.idleTimeout = data.readShort();
-        data.readByte(); // pad
-        data.readByte(); // pad
-        this.packetCount = data.readLong();
-        this.byteCount = data.readLong();
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
+        data.putLong(cookie);
+        data.putShort(priority);
+        data.put((byte) this.reason.ordinal());
+        data.put(tableId);
+        data.putInt(this.durationSeconds);
+        data.putInt(this.durationNanoseconds);
+        data.putShort(idleTimeout);
+        data.putShort(hardTimeout);
+        data.putLong(this.packetCount);
+        data.putLong(this.byteCount);
         this.match.writeTo(data);
-        data.writeLong(cookie);
-        data.writeShort(priority);
-        data.writeByte((byte) this.reason.ordinal());
-        data.writeByte((byte) 0);
-        data.writeInt(this.durationSeconds);
-        data.writeInt(this.durationNanoseconds);
-        data.writeShort(idleTimeout);
-        data.writeByte((byte) 0); // pad
-        data.writeByte((byte) 0); // pad
-        data.writeLong(this.packetCount);
-        data.writeLong(this.byteCount);
     }
 
     @Override
@@ -235,6 +259,8 @@ public class OFFlowRemoved extends OFMessage {
         result = prime * result + durationNanoseconds;
         result = prime * result + durationSeconds;
         result = prime * result + idleTimeout;
+        result = prime * result + hardTimeout;
+        result = prime * result + tableId;
         result = prime * result + ((match == null) ? 0 : match.hashCode());
         result = prime * result + (int) (packetCount ^ (packetCount >>> 32));
         result = prime * result + priority;
@@ -266,7 +292,13 @@ public class OFFlowRemoved extends OFMessage {
         if (durationSeconds != other.durationSeconds) {
             return false;
         }
+        if (tableId != other.tableId) {
+            return false;
+        }
         if (idleTimeout != other.idleTimeout) {
+            return false;
+        }
+        if (hardTimeout != other.hardTimeout) {
             return false;
         }
         if (match == null) {
@@ -290,5 +322,27 @@ public class OFFlowRemoved extends OFMessage {
             return false;
         }
         return true;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "OFFlowRemoved [cookie=" + cookie + ", priority=" + priority +  
+                ", reason=" + reason.ordinal() + ", tableId=" + tableId + 
+                ", duration_secs=" + durationSeconds + ", duration_nsecs=" + durationNanoseconds +
+                ", idleTimeout=" + idleTimeout + ", hardTimeout=" + hardTimeout +  
+                ", match=" + match + ", packet_count=" + packetCount + ", byte_count=" + byteCount + "]";
+    }
+
+    /* (non-Javadoc)
+     * @see org.openflow.protocol.OFMessage#computeLength()
+     */
+    @Override
+    public void computeLength() {
+        int l = MINIMUM_LENGTH - OFMatch.MINIMUM_LENGTH;
+        l += match.getLength();
+        this.length = U16.t(l);
     }
 }

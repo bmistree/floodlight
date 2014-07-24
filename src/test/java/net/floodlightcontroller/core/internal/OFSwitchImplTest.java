@@ -25,7 +25,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFType;
-import org.openflow.protocol.factory.BasicFactory;
+import org.openflow.protocol.factory.FloodlightFactory;
 
 import static org.junit.Assert.*;
 
@@ -53,7 +53,7 @@ public class OFSwitchImplTest {
 
     @Test
     public void testSubHandshake() {
-        OFMessage m = BasicFactory.getInstance().getMessage(OFType.VENDOR);
+        OFMessage m = FloodlightFactory.getInstance().getMessage(OFType.VENDOR);
         // test execptions before handshake is started
         try {
             sw.processDriverHandshakeMessage(m);

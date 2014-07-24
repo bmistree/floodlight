@@ -33,23 +33,19 @@ import java.util.regex.Pattern;
 import org.openflow.protocol.OFFlowMod;
 import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFMessage;
+import org.openflow.protocol.OFOXMFieldType;
 import org.openflow.protocol.OFPacketIn;
 import org.openflow.protocol.OFPacketOut;
 import org.openflow.protocol.OFPort;
+import org.openflow.protocol.OFGroup;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.action.OFAction;
-import org.openflow.protocol.action.OFActionDataLayerDestination;
-import org.openflow.protocol.action.OFActionDataLayerSource;
-import org.openflow.protocol.action.OFActionEnqueue;
-import org.openflow.protocol.action.OFActionNetworkLayerDestination;
-import org.openflow.protocol.action.OFActionNetworkLayerSource;
-import org.openflow.protocol.action.OFActionNetworkTypeOfService;
+import org.openflow.protocol.instruction.OFInstruction;
+import org.openflow.protocol.instruction.OFInstructionApplyActions;
+import org.openflow.protocol.action.OFActionSetField;
+import org.openflow.protocol.action.OFActionSetQueue;
 import org.openflow.protocol.action.OFActionOutput;
-import org.openflow.protocol.action.OFActionStripVirtualLan;
-import org.openflow.protocol.action.OFActionTransportLayerDestination;
-import org.openflow.protocol.action.OFActionTransportLayerSource;
-import org.openflow.protocol.action.OFActionVirtualLanIdentifier;
-import org.openflow.protocol.action.OFActionVirtualLanPriorityCodePoint;
+import org.openflow.protocol.action.OFActionPopVLAN;
 import org.openflow.util.HexString;
 import org.openflow.util.U16;
 import org.slf4j.Logger;
@@ -299,7 +295,7 @@ public class LoadBalancer implements IFloodlightModule,
                         arpRequest.getSenderProtocolAddress()));
                 
         // push ARP reply out
-        pushPacket(arpReply, sw, OFPacketOut.BUFFER_ID_NONE, OFPort.OFPP_NONE.getValue(),
+        pushPacket(arpReply, sw, OFPacketOut.BUFFER_ID_NONE, OFPort.OFPP_ANY.getValue(),
                    pi.getInPort(), cntx, true);
         log.debug("proxy ARP reply pushed as {}", IPv4.fromIPv4Address(vips.get(vipId).address));
         
@@ -312,16 +308,16 @@ public class LoadBalancer implements IFloodlightModule,
      * @param OFPacketIn pi
      * @param IOFSwitch sw
      * @param int bufferId
-     * @param short inPort
-     * @param short outPort
+     * @param int inPort
+     * @param int outPort
      * @param FloodlightContext cntx
      * @param boolean flush
      */    
     public void pushPacket(IPacket packet, 
                            IOFSwitch sw,
                            int bufferId,
-                           short inPort,
-                           short outPort, 
+                           int inPort,
+                           int outPort, 
                            FloodlightContext cntx,
                            boolean flush) {
         if (log.isTraceEnabled()) {
@@ -337,10 +333,7 @@ public class LoadBalancer implements IFloodlightModule,
         List<OFAction> actions = new ArrayList<OFAction>();
         actions.add(new OFActionOutput(outPort, (short) 0xffff));
 
-        po.setActions(actions)
-          .setActionsLength((short) OFActionOutput.MINIMUM_LENGTH);
-        short poLength =
-                (short) (po.getActionsLength() + OFPacketOut.MINIMUM_LENGTH);
+        po.setActions(actions);
 
         // set buffer_id, in_port
         po.setBufferId(bufferId);
@@ -356,11 +349,8 @@ public class LoadBalancer implements IFloodlightModule,
                 return;
             }
             byte[] packetData = packet.serialize();
-            poLength += packetData.length;
             po.setPacketData(packetData);
         }
-
-        po.setLength(poLength);
 
         try {
             counterStore.updatePktOutFMCounterStoreLocal(sw, po);
@@ -533,9 +523,10 @@ public class LoadBalancer implements IFloodlightModule,
                fm.setIdleTimeout((short) 0);   // infinite
                fm.setHardTimeout((short) 0);   // infinite
                fm.setBufferId(OFPacketOut.BUFFER_ID_NONE);
-               fm.setCommand((short) 0);
+               fm.setCommand((byte) 0);
                fm.setFlags((short) 0);
-               fm.setOutPort(OFPort.OFPP_NONE.getValue());
+               fm.setOutPort(OFPort.OFPP_ANY.getValue());
+               fm.setOutGroup(OFGroup.OFPG_ANY.getValue());
                fm.setCookie((long) 0);  
                fm.setPriority(Short.MAX_VALUE);
                
@@ -840,13 +831,6 @@ public class LoadBalancer implements IFloodlightModule,
         floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
         restApi.addRestletRoutable(new LoadBalancerWebRoutable());
     }
-
-    // Utilities borrowed from StaticFlowEntries
-    
-    private static class SubActionStruct {
-        OFAction action;
-        int      len;
-    }
     
     /**
      * Parses OFFlowMod actions from strings.
@@ -856,18 +840,18 @@ public class LoadBalancer implements IFloodlightModule,
      */
     public static void parseActionString(OFFlowMod flowMod, String actionstr, Logger log) {
         List<OFAction> actions = new LinkedList<OFAction>();
-        int actionsLength = 0;
+        List<OFInstruction> instructions = new LinkedList<OFInstruction>();
         if (actionstr != null) {
             actionstr = actionstr.toLowerCase();
             for (String subaction : actionstr.split(",")) {
                 String action = subaction.split("[=:]")[0];
-                SubActionStruct subaction_struct = null;
+                OFAction subaction_struct = null;
                 
                 if (action.equals("output")) {
                     subaction_struct = decode_output(subaction, log);
                 }
-                else if (action.equals("enqueue")) {
-                    subaction_struct = decode_enqueue(subaction, log);
+                else if (action.equals("set-queue")) {
+                    subaction_struct = decode_set_queue(subaction, log);
                 }
                 else if (action.equals("strip-vlan")) {
                     subaction_struct = decode_strip_vlan(subaction, log);
@@ -893,37 +877,44 @@ public class LoadBalancer implements IFloodlightModule,
                 else if (action.equals("set-dst-ip")) {
                     subaction_struct = decode_set_dst_ip(subaction, log);
                 }
-                else if (action.equals("set-src-port")) {
-                    subaction_struct = decode_set_src_port(subaction, log);
+                /* In OF1.3, there is no action for generalized TP_SRC, TP_DST. 
+                 * It is specific to TCP, UDP, SCTP
+                 */
+                else if (action.equals("set-tcp-sport")) {
+                    subaction_struct = decode_set_tcp_sport(subaction, log);
                 }
-                else if (action.equals("set-dst-port")) {
-                    subaction_struct = decode_set_dst_port(subaction, log);
+                else if (action.equals("set-tcp-dport")) {
+                    subaction_struct = decode_set_tcp_dport(subaction, log);
+                }
+                else if (action.equals("set-udp-sport")) {
+                    subaction_struct = decode_set_udp_sport(subaction, log);
+                }
+                else if (action.equals("set-udp-dport")) {
+                    subaction_struct = decode_set_udp_dport(subaction, log);
                 }
                 else {
                     log.error("Unexpected action '{}', '{}'", action, subaction);
                 }
                 
                 if (subaction_struct != null) {
-                    actions.add(subaction_struct.action);
-                    actionsLength += subaction_struct.len;
+                    actions.add(subaction_struct);
                 }
             }
         }
         log.debug("action {}", actions);
-        
-        flowMod.setActions(actions);
-        flowMod.setLengthU(OFFlowMod.MINIMUM_LENGTH + actionsLength);
+        instructions.add(new OFInstructionApplyActions().setActions(actions));
+        flowMod.setInstructions(instructions);
     } 
     
-    private static SubActionStruct decode_output(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_output(String subaction, Logger log) {
+    	OFActionOutput sa = null;
         Matcher n;
         
         n = Pattern.compile("output=(?:((?:0x)?\\d+)|(all)|(controller)|(local)|(ingress-port)|(normal)|(flood))").matcher(subaction);
         if (n.matches()) {
-            OFActionOutput action = new OFActionOutput();
-            action.setMaxLength(Short.MAX_VALUE);
-            short port = OFPort.OFPP_NONE.getValue();
+            sa = new OFActionOutput();
+            sa.setMaxLength(Short.MAX_VALUE);
+            int port = OFPort.OFPP_ANY.getValue();
             if (n.group(1) != null) {
                 try {
                     port = get_short(n.group(1));
@@ -945,12 +936,8 @@ public class LoadBalancer implements IFloodlightModule,
                 port = OFPort.OFPP_NORMAL.getValue();
             else if (n.group(7) != null)
                 port = OFPort.OFPP_FLOOD.getValue();
-            action.setPort(port);
-            log.debug("action {}", action);
-            
-            sa = new SubActionStruct();
-            sa.action = action;
-            sa.len = OFActionOutput.MINIMUM_LENGTH;
+            sa.setPort(port);
+            log.debug("action {}", sa);
         }
         else {
             log.error("Invalid subaction: '{}'", subaction);
@@ -960,27 +947,16 @@ public class LoadBalancer implements IFloodlightModule,
         return sa;
     }
     
-    private static SubActionStruct decode_enqueue(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_queue(String subaction, Logger log) {
+        OFAction sa = null;
         Matcher n;
         
-        n = Pattern.compile("enqueue=(?:((?:0x)?\\d+)\\:((?:0x)?\\d+))").matcher(subaction);
+        n = Pattern.compile("set-queue=(?:((?:0x)?\\d+)\\:((?:0x)?\\d+))").matcher(subaction);
         if (n.matches()) {
-            short portnum = 0;
+            int queueid = 0;
             if (n.group(1) != null) {
                 try {
-                    portnum = get_short(n.group(1));
-                }
-                catch (NumberFormatException e) {
-                    log.debug("Invalid port-num in: '{}' (error ignored)", subaction);
-                    return null;
-                }
-            }
-
-            int queueid = 0;
-            if (n.group(2) != null) {
-                try {
-                    queueid = get_int(n.group(2));
+                    queueid = get_int(n.group(1));
                 }
                 catch (NumberFormatException e) {
                     log.debug("Invalid queue-id in: '{}' (error ignored)", subaction);
@@ -988,14 +964,8 @@ public class LoadBalancer implements IFloodlightModule,
                }
             }
             
-            OFActionEnqueue action = new OFActionEnqueue();
-            action.setPort(portnum);
-            action.setQueueId(queueid);
-            log.debug("action {}", action);
-            
-            sa = new SubActionStruct();
-            sa.action = action;
-            sa.len = OFActionEnqueue.MINIMUM_LENGTH;
+            sa = new OFActionSetQueue().setQueueId(queueid);
+            log.debug("action {}", sa);
         }
         else {
             log.debug("Invalid action: '{}'", subaction);
@@ -1005,17 +975,13 @@ public class LoadBalancer implements IFloodlightModule,
         return sa;
     }
     
-    private static SubActionStruct decode_strip_vlan(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_strip_vlan(String subaction, Logger log) {
+        OFAction sa = null;
         Matcher n = Pattern.compile("strip-vlan").matcher(subaction);
         
         if (n.matches()) {
-            OFActionStripVirtualLan action = new OFActionStripVirtualLan();
-            log.debug("action {}", action);
-            
-            sa = new SubActionStruct();
-            sa.action = action;
-            sa.len = OFActionStripVirtualLan.MINIMUM_LENGTH;
+            sa = new OFActionPopVLAN();
+            log.debug("action {}", sa);
         }
         else {
             log.debug("Invalid action: '{}'", subaction);
@@ -1025,21 +991,16 @@ public class LoadBalancer implements IFloodlightModule,
         return sa;
     }
     
-    private static SubActionStruct decode_set_vlan_id(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_vlan_id(String subaction, Logger log) {
+        OFAction sa = null;
         Matcher n = Pattern.compile("set-vlan-id=((?:0x)?\\d+)").matcher(subaction);
         
         if (n.matches()) {            
             if (n.group(1) != null) {
                 try {
                     short vlanid = get_short(n.group(1));
-                    OFActionVirtualLanIdentifier action = new OFActionVirtualLanIdentifier();
-                    action.setVirtualLanIdentifier(vlanid);
-                    log.debug("  action {}", action);
-
-                    sa = new SubActionStruct();
-                    sa.action = action;
-                    sa.len = OFActionVirtualLanIdentifier.MINIMUM_LENGTH;
+                    sa = new OFActionSetField(OFOXMFieldType.VLAN_VID, vlanid);
+                    log.debug("action {}", sa);
                 }
                 catch (NumberFormatException e) {
                     log.debug("Invalid VLAN in: {} (error ignored)", subaction);
@@ -1055,21 +1016,16 @@ public class LoadBalancer implements IFloodlightModule,
         return sa;
     }
     
-    private static SubActionStruct decode_set_vlan_priority(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_vlan_priority(String subaction, Logger log) {
+        OFAction sa = null;
         Matcher n = Pattern.compile("set-vlan-priority=((?:0x)?\\d+)").matcher(subaction); 
         
         if (n.matches()) {
             if (n.group(1) != null) {
                 try {
                     byte prior = get_byte(n.group(1));
-                    OFActionVirtualLanPriorityCodePoint action = new OFActionVirtualLanPriorityCodePoint();
-                    action.setVirtualLanPriorityCodePoint(prior);
-                    log.debug("  action {}", action);
-                    
-                    sa = new SubActionStruct();
-                    sa.action = action;
-                    sa.len = OFActionVirtualLanPriorityCodePoint.MINIMUM_LENGTH;
+                    sa = new OFActionSetField(OFOXMFieldType.ETH_SRC, prior);
+                    log.debug("  action {}", sa);
                 }
                 catch (NumberFormatException e) {
                     log.debug("Invalid VLAN priority in: {} (error ignored)", subaction);
@@ -1085,20 +1041,15 @@ public class LoadBalancer implements IFloodlightModule,
         return sa;
     }
     
-    private static SubActionStruct decode_set_src_mac(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_src_mac(String subaction, Logger log) {
+    	OFActionSetField sa = null;
         Matcher n = Pattern.compile("set-src-mac=(?:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+))").matcher(subaction); 
 
         if (n.matches()) {
             byte[] macaddr = get_mac_addr(n, subaction, log);
             if (macaddr != null) {
-                OFActionDataLayerSource action = new OFActionDataLayerSource();
-                action.setDataLayerAddress(macaddr);
-                log.debug("action {}", action);
-
-                sa = new SubActionStruct();
-                sa.action = action;
-                sa.len = OFActionDataLayerSource.MINIMUM_LENGTH;
+                sa = new OFActionSetField(OFOXMFieldType.ETH_SRC, macaddr);
+                log.debug("action {}", sa);
             }
         }
         else {
@@ -1109,20 +1060,15 @@ public class LoadBalancer implements IFloodlightModule,
         return sa;
     }
 
-    private static SubActionStruct decode_set_dst_mac(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_dst_mac(String subaction, Logger log) {
+        OFActionSetField sa = null;
         Matcher n = Pattern.compile("set-dst-mac=(?:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+)\\:(\\p{XDigit}+))").matcher(subaction);
         
         if (n.matches()) {
             byte[] macaddr = get_mac_addr(n, subaction, log);
             if (macaddr != null) {
-                OFActionDataLayerDestination action = new OFActionDataLayerDestination();
-                action.setDataLayerAddress(macaddr);
-                log.debug("  action {}", action);
-                
-                sa = new SubActionStruct();
-                sa.action = action;
-                sa.len = OFActionDataLayerDestination.MINIMUM_LENGTH;
+                sa = new OFActionSetField(OFOXMFieldType.ETH_DST, macaddr);
+                log.debug("  action {}", sa);
             }
         }
         else {
@@ -1133,21 +1079,16 @@ public class LoadBalancer implements IFloodlightModule,
         return sa;
     }
     
-    private static SubActionStruct decode_set_tos_bits(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_tos_bits(String subaction, Logger log) {
+    	OFActionSetField sa = null;
         Matcher n = Pattern.compile("set-tos-bits=((?:0x)?\\d+)").matcher(subaction); 
 
         if (n.matches()) {
             if (n.group(1) != null) {
                 try {
                     byte tosbits = get_byte(n.group(1));
-                    OFActionNetworkTypeOfService action = new OFActionNetworkTypeOfService();
-                    action.setNetworkTypeOfService(tosbits);
-                    log.debug("  action {}", action);
-                    
-                    sa = new SubActionStruct();
-                    sa.action = action;
-                    sa.len = OFActionNetworkTypeOfService.MINIMUM_LENGTH;
+                    sa = new OFActionSetField(OFOXMFieldType.IP_DSCP, tosbits);
+                    log.debug("action {}", sa);
                 }
                 catch (NumberFormatException e) {
                     log.debug("Invalid dst-port in: {} (error ignored)", subaction);
@@ -1163,19 +1104,14 @@ public class LoadBalancer implements IFloodlightModule,
         return sa;
     }
     
-    private static SubActionStruct decode_set_src_ip(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_src_ip(String subaction, Logger log) {
+    	OFActionSetField sa = null;
         Matcher n = Pattern.compile("set-src-ip=(?:(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+))").matcher(subaction);
 
         if (n.matches()) {
             int ipaddr = get_ip_addr(n, subaction, log);
-            OFActionNetworkLayerSource action = new OFActionNetworkLayerSource();
-            action.setNetworkAddress(ipaddr);
-            log.debug("  action {}", action);
-
-            sa = new SubActionStruct();
-            sa.action = action;
-            sa.len = OFActionNetworkLayerSource.MINIMUM_LENGTH;
+            sa = new OFActionSetField(OFOXMFieldType.IPV4_SRC, ipaddr);
+            log.debug("action {}", sa);
         }
         else {
             log.debug("Invalid action: '{}'", subaction);
@@ -1185,19 +1121,14 @@ public class LoadBalancer implements IFloodlightModule,
         return sa;
     }
 
-    private static SubActionStruct decode_set_dst_ip(String subaction, Logger log) {
-        SubActionStruct sa = null;
+    private static OFAction decode_set_dst_ip(String subaction, Logger log) {
+        OFActionSetField sa = null;
         Matcher n = Pattern.compile("set-dst-ip=(?:(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+))").matcher(subaction);
 
         if (n.matches()) {
             int ipaddr = get_ip_addr(n, subaction, log);
-            OFActionNetworkLayerDestination action = new OFActionNetworkLayerDestination();
-            action.setNetworkAddress(ipaddr);
-            log.debug("action {}", action);
- 
-            sa = new SubActionStruct();
-            sa.action = action;
-            sa.len = OFActionNetworkLayerDestination.MINIMUM_LENGTH;
+            sa = new OFActionSetField(OFOXMFieldType.IPV4_DST, ipaddr);
+            log.debug("action {}", sa);
         }
         else {
             log.debug("Invalid action: '{}'", subaction);
@@ -1207,24 +1138,19 @@ public class LoadBalancer implements IFloodlightModule,
         return sa;
     }
 
-    private static SubActionStruct decode_set_src_port(String subaction, Logger log) {
-        SubActionStruct sa = null;
-        Matcher n = Pattern.compile("set-src-port=((?:0x)?\\d+)").matcher(subaction); 
+    private static OFAction decode_set_tcp_sport(String subaction, Logger log) {
+        OFActionSetField sa = null;
+        Matcher n = Pattern.compile("set-tcp-sport=((?:0x)?\\d+)").matcher(subaction); 
 
         if (n.matches()) {
             if (n.group(1) != null) {
                 try {
-                    short portnum = get_short(n.group(1));
-                    OFActionTransportLayerSource action = new OFActionTransportLayerSource();
-                    action.setTransportPort(portnum);
-                    log.debug("action {}", action);
-                    
-                    sa = new SubActionStruct();
-                    sa.action = action;
-                    sa.len = OFActionTransportLayerSource.MINIMUM_LENGTH;;
+                    int portnum = get_short(n.group(1));
+                    sa = new OFActionSetField(OFOXMFieldType.TCP_SRC, portnum);
+                    log.debug("action {}", sa);
                 }
                 catch (NumberFormatException e) {
-                    log.debug("Invalid src-port in: {} (error ignored)", subaction);
+                    log.debug("Invalid tcp-sport in: {} (error ignored)", subaction);
                     return null;
                 }
             }
@@ -1237,24 +1163,19 @@ public class LoadBalancer implements IFloodlightModule,
         return sa;
     }
 
-    private static SubActionStruct decode_set_dst_port(String subaction, Logger log) {
-        SubActionStruct sa = null;
-        Matcher n = Pattern.compile("set-dst-port=((?:0x)?\\d+)").matcher(subaction);
+    private static OFAction decode_set_tcp_dport(String subaction, Logger log) {
+        OFActionSetField sa = null;
+        Matcher n = Pattern.compile("set-tcp-dport=((?:0x)?\\d+)").matcher(subaction); 
 
         if (n.matches()) {
             if (n.group(1) != null) {
                 try {
-                    short portnum = get_short(n.group(1));
-                    OFActionTransportLayerDestination action = new OFActionTransportLayerDestination();
-                    action.setTransportPort(portnum);
-                    log.debug("action {}", action);
-                    
-                    sa = new SubActionStruct();
-                    sa.action = action;
-                    sa.len = OFActionTransportLayerDestination.MINIMUM_LENGTH;;
+                    int portnum = get_short(n.group(1));
+                    sa = new OFActionSetField(OFOXMFieldType.TCP_DST, portnum);
+                    log.debug("action {}", sa);
                 }
                 catch (NumberFormatException e) {
-                    log.debug("Invalid dst-port in: {} (error ignored)", subaction);
+                    log.debug("Invalid tcp-sport in: {} (error ignored)", subaction);
                     return null;
                 }
             }
@@ -1266,7 +1187,57 @@ public class LoadBalancer implements IFloodlightModule,
 
         return sa;
     }
-    
+
+    private static OFAction decode_set_udp_sport(String subaction, Logger log) {
+        OFActionSetField sa = null;
+        Matcher n = Pattern.compile("set-udp-sport=((?:0x)?\\d+)").matcher(subaction); 
+
+        if (n.matches()) {
+            if (n.group(1) != null) {
+                try {
+                    int portnum = get_short(n.group(1));
+                    sa = new OFActionSetField(OFOXMFieldType.UDP_SRC, portnum);
+                    log.debug("action {}", sa);
+                }
+                catch (NumberFormatException e) {
+                    log.debug("Invalid udp-sport in: {} (error ignored)", subaction);
+                    return null;
+                }
+            }
+        }
+        else {
+            log.debug("Invalid action: '{}'", subaction);
+            return null;
+        }
+
+        return sa;
+    }
+
+    private static OFAction decode_set_udp_dport(String subaction, Logger log) {
+        OFActionSetField sa = null;
+        Matcher n = Pattern.compile("set-udp-dport=((?:0x)?\\d+)").matcher(subaction); 
+
+        if (n.matches()) {
+            if (n.group(1) != null) {
+                try {
+                    int portnum = get_short(n.group(1));
+                    sa = new OFActionSetField(OFOXMFieldType.UDP_DST, portnum);
+                    log.debug("action {}", sa);
+                }
+                catch (NumberFormatException e) {
+                    log.debug("Invalid tcp-sport in: {} (error ignored)", subaction);
+                    return null;
+                }
+            }
+        }
+        else {
+            log.debug("Invalid action: '{}'", subaction);
+            return null;
+        }
+
+        return sa;
+    }
+
     private static byte[] get_mac_addr(Matcher n, String subaction, Logger log) {
         byte[] macaddr = new byte[6];
         

@@ -1,37 +1,29 @@
-/**
-*    Copyright 2012, Andrew Ferguson, Brown University
-*
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.util.U16;
+import org.openflow.protocol.factory.OFQueuePropertyFactory;
+import org.openflow.protocol.factory.OFQueuePropertyFactoryAware;
+import org.openflow.protocol.queue.OFPacketQueue;
 
 /**
- * Represents an ofp_queue_get_config_request message
- * @author Andrew Ferguson (adf@cs.brown.edu)
+ *
+ * @author David Erickson (daviderickson@cs.stanford.edu)
  */
-public class OFQueueGetConfigReply extends OFMessage {
+public class OFQueueGetConfigReply extends OFMessage implements Cloneable, OFQueuePropertyFactoryAware {
     public static int MINIMUM_LENGTH = 16;
 
-    protected short portNumber;
-    protected List<OFPacketQueue> queues = new ArrayList<OFPacketQueue>();
+    protected OFQueuePropertyFactory queuePropertyFactory;
 
+    protected int portNumber;
+    protected List<OFPacketQueue> queues;
+
+    /**
+     * 
+     */
     public OFQueueGetConfigReply() {
         super();
         this.type = OFType.QUEUE_GET_CONFIG_REPLY;
@@ -41,19 +33,20 @@ public class OFQueueGetConfigReply extends OFMessage {
     /**
      * @return the portNumber
      */
-    public short getPortNumber() {
+    public int getPortNumber() {
         return portNumber;
     }
 
     /**
-     * @param portNumber the portNumber to set
+     * @param port the portNumber to set
      */
-    public void setPortNumber(short portNumber) {
+    public OFQueueGetConfigReply setPortNumber(int portNumber) {
         this.portNumber = portNumber;
+        return this;
     }
 
     /**
-     * @return the port's queues
+     * @return the queues
      */
     public List<OFPacketQueue> getQueues() {
         return queues;
@@ -62,64 +55,109 @@ public class OFQueueGetConfigReply extends OFMessage {
     /**
      * @param queues the queues to set
      */
-    public void setQueues(List<OFPacketQueue> queues) {
-        this.queues.clear();
-        this.queues.addAll(queues);
+    public OFQueueGetConfigReply setQueues(List<OFPacketQueue> queues) {
+        this.queues = queues;
+        return this;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        this.portNumber = data.readShort();
-        data.readInt();   // pad
-        data.readShort(); // pad
-
-        int availLength = (this.length - MINIMUM_LENGTH);
-        this.queues.clear();
-
-        while (availLength > 0) {
+        this.portNumber = data.getInt();
+        data.getInt(); // pad
+        int remaining = this.getLengthU() - MINIMUM_LENGTH;
+        if (data.remaining() < remaining)
+            remaining = data.remaining();
+        this.queues = new ArrayList<OFPacketQueue>();
+        while (remaining >= OFPacketQueue.MINIMUM_LENGTH) {
             OFPacketQueue queue = new OFPacketQueue();
+            queue.setQueuePropertyFactory(this.queuePropertyFactory);
             queue.readFrom(data);
-            queues.add(queue);
-            availLength -= queue.getLength();
+            remaining -= U16.f(queue.getLength());
+            this.queues.add(queue);
         }
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeShort(this.portNumber);
-        data.writeInt(0);   // pad
-        data.writeShort(0); // pad
-
-        for (OFPacketQueue queue : queues) {
-            queue.writeTo(data);
+        data.putInt(this.portNumber);
+        data.putInt(0); // pad
+        if (this.queues != null) {
+            for (OFPacketQueue queue : this.queues) {
+                queue.writeTo(data);
+            }
         }
     }
 
     @Override
     public int hashCode() {
-        final int prime = 349;
+        final int prime = 4549;
         int result = super.hashCode();
         result = prime * result + portNumber;
+        result = prime * result + ((queues == null) ? 0 : queues.hashCode());
         return result;
     }
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) {
+        if (this == obj)
             return true;
-        }
-        if (!super.equals(obj)) {
+        if (!super.equals(obj))
             return false;
-        }
-        if (!(obj instanceof OFQueueGetConfigReply)) {
+        if (!(obj instanceof OFQueueGetConfigReply))
             return false;
-        }
         OFQueueGetConfigReply other = (OFQueueGetConfigReply) obj;
-        if (portNumber != other.portNumber) {
+        if (portNumber != other.portNumber)
             return false;
-        }
+        if (queues == null) {
+            if (other.queues != null)
+                return false;
+        } else if (!queues.equals(other.queues))
+            return false;
         return true;
+    }
+
+    @Override
+    public void setQueuePropertyFactory(
+            OFQueuePropertyFactory queuePropertyFactory) {
+        this.queuePropertyFactory = queuePropertyFactory;
+    }
+
+    @Override
+    public OFQueueGetConfigReply clone() {
+        try {
+            OFQueueGetConfigReply clone = (OFQueueGetConfigReply) super.clone();
+            if (this.queues != null) {
+                List<OFPacketQueue> queues = new ArrayList<OFPacketQueue>();
+                for (OFPacketQueue queue : this.queues) {
+                    queues.add(queue.clone());
+                }
+                clone.setQueues(queues);
+            }
+            return clone;
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "OFQueueGetConfigReply [portNumber=" + portNumber + ", queues=" + queues
+                + ", xid=" + xid + "]";
+    }
+
+    /* (non-Javadoc)
+     * @see org.openflow.protocol.OFMessage#computeLength()
+     */
+    @Override
+    public void computeLength() {
+        int l = MINIMUM_LENGTH;
+        if (queues != null) {
+            for (OFPacketQueue queue : queues) {
+                l += queue.computeLength();
+            }
+        }
+        this.length = U16.t(l);
     }
 }

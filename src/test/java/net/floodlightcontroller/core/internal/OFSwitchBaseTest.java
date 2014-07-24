@@ -56,7 +56,7 @@ import org.openflow.protocol.OFPacketIn.OFPacketInReason;
 import org.openflow.protocol.OFPhysicalPort.OFPortConfig;
 import org.openflow.protocol.OFPhysicalPort.OFPortFeatures;
 import org.openflow.protocol.OFPortStatus.OFPortReason;
-import org.openflow.protocol.factory.BasicFactory;
+import org.openflow.protocol.factory.FloodlightFactory;
 import org.openflow.protocol.statistics.OFDescriptionStatistics;
 import org.openflow.util.HexString;
 
@@ -83,13 +83,13 @@ public class OFSwitchBaseTest {
         }
 
         @Override
-        public OFPortType getPortType(short port_num) {
+        public OFPortType getPortType(int port_num) {
             // TODO Auto-generated method stub
             return null;
         }
 
         @Override
-        public boolean isFastPort(short port_num) {
+        public boolean isFastPort(int port_num) {
             // TODO Auto-generated method stub
             return false;
         }
@@ -118,10 +118,10 @@ public class OFSwitchBaseTest {
     private ImmutablePort p2a;
     private ImmutablePort p2b;
     private ImmutablePort p3;
-    private final ImmutablePort portFoo1 = ImmutablePort.create("foo", (short)11);
-    private final ImmutablePort portFoo2 = ImmutablePort.create("foo", (short)12);
-    private final ImmutablePort portBar1 = ImmutablePort.create("bar", (short)11);
-    private final ImmutablePort portBar2 = ImmutablePort.create("bar", (short)12);
+    private final ImmutablePort portFoo1 = ImmutablePort.create("foo", (int)11);
+    private final ImmutablePort portFoo2 = ImmutablePort.create("foo", (int)12);
+    private final ImmutablePort portBar1 = ImmutablePort.create("bar", (int)11);
+    private final ImmutablePort portBar2 = ImmutablePort.create("bar", (int)12);
     private final PortChangeEvent portFoo1Add =
             new PortChangeEvent(portFoo1, PortChangeType.ADD);
     private final PortChangeEvent portFoo2Add =
@@ -160,9 +160,9 @@ public class OFSwitchBaseTest {
                 .setTargetProtocolAddress(IPv4.toIPv4AddressBytes("192.168.1.2")));
         testPacketSerialized = testPacket.serialize();
 
-        pi = ((OFPacketIn) BasicFactory.getInstance().getMessage(OFType.PACKET_IN))
+        pi = ((OFPacketIn) FloodlightFactory.getInstance().getMessage(OFType.PACKET_IN))
                 .setBufferId(-1)
-                .setInPort((short) 1)
+                .setMatch(new OFMatch().setInPort(1))
                 .setPacketData(testPacketSerialized)
                 .setReason(OFPacketInReason.NO_MATCH)
                 .setTotalLength((short) testPacketSerialized.length);
@@ -174,7 +174,7 @@ public class OFSwitchBaseTest {
         switches.put(sw.getId(), sw);
         expect(floodlightProvider.getSwitch(sw.getId())).andReturn(sw).anyTimes();
         expect(floodlightProvider.getOFMessageFactory())
-                .andReturn(BasicFactory.getInstance()).anyTimes();
+                .andReturn(FloodlightFactory.getInstance()).anyTimes();
     }
 
     @Before
@@ -182,7 +182,7 @@ public class OFSwitchBaseTest {
         ImmutablePort.Builder bld = new ImmutablePort.Builder();
         // p1a is disabled
         p1a = bld.setName("port1")
-                 .setPortNumber((short)1)
+                 .setPortNumber((int)1)
                  .setPortStateLinkDown(true)
                  .build();
         assertFalse("Sanity check portEnabled", p1a.isEnabled());
@@ -198,7 +198,7 @@ public class OFSwitchBaseTest {
         // p2 has mixed case
         bld = new ImmutablePort.Builder();
         p2a = bld.setName("Port2")
-                .setPortNumber((short)2)
+                .setPortNumber((int)2)
                 .setPortStateLinkDown(false)
                 .addConfig(OFPortConfig.OFPPC_PORT_DOWN)
                 .build();
@@ -210,7 +210,7 @@ public class OFSwitchBaseTest {
         // p3 has mixed case
         bld = new ImmutablePort.Builder();
         p3 = bld.setName("porT3")
-                .setPortNumber((short)3)
+                .setPortNumber((int)3)
                 .setPortStateLinkDown(false)
                 .build();
         assertTrue("Sanity check portEnabled", p3.isEnabled());
@@ -411,7 +411,7 @@ public class OFSwitchBaseTest {
     public void testBasicSetPortOperations() {
         Collection<ImmutablePort> oldPorts = Collections.emptyList();
         Collection<ImmutablePort> oldEnabledPorts = Collections.emptyList();
-        Collection<Short> oldEnabledPortNumbers = Collections.emptyList();
+        Collection<int> oldEnabledPortNumbers = Collections.emptyList();
         List<ImmutablePort> ports = new ArrayList<ImmutablePort>();
 
 
@@ -460,15 +460,15 @@ public class OFSwitchBaseTest {
                    sw.getEnabledPortNumbers().isEmpty());
         assertTrue("enabled ports should be empty",
                    sw.getEnabledPorts().isEmpty());
-        assertEquals(p1a, sw.getPort((short)1));
+        assertEquals(p1a, sw.getPort((int)1));
         assertEquals(p1a, sw.getPort("port1"));
         assertEquals(p1a, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(p2a, sw.getPort((short)2));
+        assertEquals(p2a, sw.getPort((int)2));
         assertEquals(p2a, sw.getPort("port2"));
         assertEquals(p2a, sw.getPort("PoRt2")); // case insensitive get
 
-        assertEquals(null, sw.getPort((short)3));
+        assertEquals(null, sw.getPort((int)3));
         assertEquals(null, sw.getPort("port3"));
         assertEquals(null, sw.getPort("PoRt3")); // case insensitive get
 
@@ -498,15 +498,15 @@ public class OFSwitchBaseTest {
                    sw.getEnabledPortNumbers().isEmpty());
         assertTrue("enabled ports should be empty",
                    sw.getEnabledPorts().isEmpty());
-        assertEquals(p1a, sw.getPort((short)1));
+        assertEquals(p1a, sw.getPort((int)1));
         assertEquals(p1a, sw.getPort("port1"));
         assertEquals(p1a, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(p2a, sw.getPort((short)2));
+        assertEquals(p2a, sw.getPort((int)2));
         assertEquals(p2a, sw.getPort("port2"));
         assertEquals(p2a, sw.getPort("PoRt2")); // case insensitive get
 
-        assertEquals(null, sw.getPort((short)3));
+        assertEquals(null, sw.getPort((int)3));
         assertEquals(null, sw.getPort("port3"));
         assertEquals(null, sw.getPort("PoRt3")); // case insensitive get
 
@@ -535,20 +535,20 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(ports, sw.getPorts());
         List<ImmutablePort> enabledPorts = new ArrayList<ImmutablePort>();
         enabledPorts.add(p1b);
-        List<Short> enabledPortNumbers = new ArrayList<Short>();
-        enabledPortNumbers.add((short)1);
+        List<Integer> enabledPortNumbers = new ArrayList<Integer>();
+        enabledPortNumbers.add((int)1);
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(p1b, sw.getPort((short)1));
+        assertEquals(p1b, sw.getPort((int)1));
         assertEquals(p1b, sw.getPort("port1"));
         assertEquals(p1b, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(p2a, sw.getPort((short)2));
+        assertEquals(p2a, sw.getPort((int)2));
         assertEquals(p2a, sw.getPort("port2"));
         assertEquals(p2a, sw.getPort("PoRt2")); // case insensitive get
 
-        assertEquals(null, sw.getPort((short)3));
+        assertEquals(null, sw.getPort((int)3));
         assertEquals(null, sw.getPort("port3"));
         assertEquals(null, sw.getPort("PoRt3")); // case insensitive get
 
@@ -581,20 +581,20 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(ports, sw.getPorts());
         enabledPorts = new ArrayList<ImmutablePort>();
         enabledPorts.add(p1b);
-        enabledPortNumbers = new ArrayList<Short>();
-        enabledPortNumbers.add((short)1);
+        enabledPortNumbers = new ArrayList<Integer>();
+        enabledPortNumbers.add((int)1);
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(p1b, sw.getPort((short)1));
+        assertEquals(p1b, sw.getPort((int)1));
         assertEquals(p1b, sw.getPort("port1"));
         assertEquals(p1b, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(p2b, sw.getPort((short)2));
+        assertEquals(p2b, sw.getPort((int)2));
         assertEquals(p2b, sw.getPort("port2"));
         assertEquals(p2b, sw.getPort("PoRt2")); // case insensitive get
 
-        assertEquals(null, sw.getPort((short)3));
+        assertEquals(null, sw.getPort((int)3));
         assertEquals(null, sw.getPort("port3"));
         assertEquals(null, sw.getPort("PoRt3")); // case insensitive get
 
@@ -636,19 +636,19 @@ public class OFSwitchBaseTest {
         enabledPorts.clear();
         enabledPorts.add(p3);
         enabledPortNumbers.clear();
-        enabledPortNumbers.add((short)3);
+        enabledPortNumbers.add((int)3);
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(p1a, sw.getPort((short)1));
+        assertEquals(p1a, sw.getPort((int)1));
         assertEquals(p1a, sw.getPort("port1"));
         assertEquals(p1a, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(p2a, sw.getPort((short)2));
+        assertEquals(p2a, sw.getPort((int)2));
         assertEquals(p2a, sw.getPort("port2"));
         assertEquals(p2a, sw.getPort("PoRt2")); // case insensitive get
 
-        assertEquals(p3, sw.getPort((short)3));
+        assertEquals(p3, sw.getPort((int)3));
         assertEquals(p3, sw.getPort("port3"));
         assertEquals(p3, sw.getPort("PoRt3")); // case insensitive get
 
@@ -684,12 +684,12 @@ public class OFSwitchBaseTest {
         enabledPorts.clear();
         enabledPorts.add(p3);
         enabledPortNumbers.clear();
-        enabledPortNumbers.add((short)3);
+        enabledPortNumbers.add((int)3);
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
 
-        assertEquals(p3, sw.getPort((short)3));
+        assertEquals(p3, sw.getPort((int)3));
         assertEquals(p3, sw.getPort("port3"));
         assertEquals(p3, sw.getPort("PoRt3")); // case insensitive get
     }
@@ -702,7 +702,7 @@ public class OFSwitchBaseTest {
     @Test
     public void testBasicPortStatusOperation() {
         OFPortStatus ps = (OFPortStatus)
-                BasicFactory.getInstance().getMessage(OFType.PORT_STATUS);
+                FloodlightFactory.getInstance().getMessage(OFType.PORT_STATUS);
         List<ImmutablePort> ports = new ArrayList<ImmutablePort>();
         ports.add(p1a);
         ports.add(p2a);
@@ -735,11 +735,11 @@ public class OFSwitchBaseTest {
                    sw.getEnabledPortNumbers().isEmpty());
         assertTrue("enabled ports should be empty",
                    sw.getEnabledPorts().isEmpty());
-        assertEquals(p1a, sw.getPort((short)1));
+        assertEquals(p1a, sw.getPort((int)1));
         assertEquals(p1a, sw.getPort("port1"));
         assertEquals(p1a, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(p2a, sw.getPort((short)2));
+        assertEquals(p2a, sw.getPort((int)2));
         assertEquals(p2a, sw.getPort("port2"));
         assertEquals(p2a, sw.getPort("PoRt2")); // case insensitive get
 
@@ -749,7 +749,7 @@ public class OFSwitchBaseTest {
         ports.add(p2a);
         ports.add(p1b);
 
-        ps.setReason(OFPortReason.OFPPR_MODIFY.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_MODIFY);
         ps.setDesc(p1b.toOFPhysicalPort());
 
         PortChangeEvent evP1bUp = new PortChangeEvent(p1b, PortChangeType.UP);
@@ -760,16 +760,16 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(ports, sw.getPorts());
         List<ImmutablePort> enabledPorts = new ArrayList<ImmutablePort>();
         enabledPorts.add(p1b);
-        List<Short> enabledPortNumbers = new ArrayList<Short>();
-        enabledPortNumbers.add((short)1);
+        List<Integer> enabledPortNumbers = new ArrayList<Integer>();
+        enabledPortNumbers.add((int)1);
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(p1b, sw.getPort((short)1));
+        assertEquals(p1b, sw.getPort((int)1));
         assertEquals(p1b, sw.getPort("port1"));
         assertEquals(p1b, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(p2a, sw.getPort((short)2));
+        assertEquals(p2a, sw.getPort((int)2));
         assertEquals(p2a, sw.getPort("port2"));
         assertEquals(p2a, sw.getPort("PoRt2")); // case insensitive get
 
@@ -782,7 +782,7 @@ public class OFSwitchBaseTest {
         PortChangeEvent evP2bModified =
                 new PortChangeEvent(p2b, PortChangeType.OTHER_UPDATE);
 
-        ps.setReason(OFPortReason.OFPPR_MODIFY.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_MODIFY);
         ps.setDesc(p2b.toOFPhysicalPort());
 
         actualChanges = sw.processOFPortStatus(ps);
@@ -792,20 +792,20 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(ports, sw.getPorts());
         enabledPorts = new ArrayList<ImmutablePort>();
         enabledPorts.add(p1b);
-        enabledPortNumbers = new ArrayList<Short>();
-        enabledPortNumbers.add((short)1);
+        enabledPortNumbers = new ArrayList<Integer>();
+        enabledPortNumbers.add((int)1);
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(p1b, sw.getPort((short)1));
+        assertEquals(p1b, sw.getPort((int)1));
         assertEquals(p1b, sw.getPort("port1"));
         assertEquals(p1b, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(p2b, sw.getPort((short)2));
+        assertEquals(p2b, sw.getPort((int)2));
         assertEquals(p2b, sw.getPort("port2"));
         assertEquals(p2b, sw.getPort("PoRt2")); // case insensitive get
 
-        assertEquals(null, sw.getPort((short)3));
+        assertEquals(null, sw.getPort((int)3));
         assertEquals(null, sw.getPort("port3"));
         assertEquals(null, sw.getPort("PoRt3")); // case insensitive get
 
@@ -817,7 +817,7 @@ public class OFSwitchBaseTest {
         ports.add(p1a);
 
         // we use an ADD here. We treat ADD and MODIFY the same way
-        ps.setReason(OFPortReason.OFPPR_ADD.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_ADD);
         ps.setDesc(p1a.toOFPhysicalPort());
 
         PortChangeEvent evP1aDown =
@@ -832,11 +832,11 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(p1a, sw.getPort((short)1));
+        assertEquals(p1a, sw.getPort((int)1));
         assertEquals(p1a, sw.getPort("port1"));
         assertEquals(p1a, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(p2b, sw.getPort((short)2));
+        assertEquals(p2b, sw.getPort((int)2));
         assertEquals(p2b, sw.getPort("port2"));
         assertEquals(p2b, sw.getPort("PoRt2")); // case insensitive get
 
@@ -848,7 +848,7 @@ public class OFSwitchBaseTest {
         ports.add(p1a);
 
         // we use an ADD here. We treat ADD and MODIFY the same way
-        ps.setReason(OFPortReason.OFPPR_ADD.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_ADD);
         ps.setDesc(p2a.toOFPhysicalPort());
 
         PortChangeEvent evP2aModify =
@@ -863,11 +863,11 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(p1a, sw.getPort((short)1));
+        assertEquals(p1a, sw.getPort((int)1));
         assertEquals(p1a, sw.getPort("port1"));
         assertEquals(p1a, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(p2a, sw.getPort((short)2));
+        assertEquals(p2a, sw.getPort((int)2));
         assertEquals(p2a, sw.getPort("port2"));
         assertEquals(p2a, sw.getPort("PoRt2")); // case insensitive get
 
@@ -877,7 +877,7 @@ public class OFSwitchBaseTest {
         ports.clear();
         ports.add(p1a);
 
-        ps.setReason(OFPortReason.OFPPR_DELETE.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_DELETE);
         ps.setDesc(p2a.toOFPhysicalPort());
 
         PortChangeEvent evP2aDel =
@@ -892,11 +892,11 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(p1a, sw.getPort((short)1));
+        assertEquals(p1a, sw.getPort((int)1));
         assertEquals(p1a, sw.getPort("port1"));
         assertEquals(p1a, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(null, sw.getPort((short)2));
+        assertEquals(null, sw.getPort((int)2));
         assertEquals(null, sw.getPort("port2"));
         assertEquals(null, sw.getPort("PoRt2")); // case insensitive get
 
@@ -905,7 +905,7 @@ public class OFSwitchBaseTest {
         ports.clear();
         ports.add(p1a);
 
-        ps.setReason(OFPortReason.OFPPR_DELETE.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_DELETE);
         ps.setDesc(p2a.toOFPhysicalPort());
 
         actualChanges = sw.processOFPortStatus(ps);
@@ -917,11 +917,11 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(p1a, sw.getPort((short)1));
+        assertEquals(p1a, sw.getPort((int)1));
         assertEquals(p1a, sw.getPort("port1"));
         assertEquals(p1a, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(null, sw.getPort((short)2));
+        assertEquals(null, sw.getPort((int)2));
         assertEquals(null, sw.getPort("port2"));
         assertEquals(null, sw.getPort("PoRt2")); // case insensitive get
 
@@ -930,7 +930,7 @@ public class OFSwitchBaseTest {
         // Remove p1a
         ports.clear();
 
-        ps.setReason(OFPortReason.OFPPR_DELETE.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_DELETE);
         ps.setDesc(p1a.toOFPhysicalPort());
 
         PortChangeEvent evP1aDel =
@@ -945,11 +945,11 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(null, sw.getPort((short)1));
+        assertEquals(null, sw.getPort((int)1));
         assertEquals(null, sw.getPort("port1"));
         assertEquals(null, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(null, sw.getPort((short)2));
+        assertEquals(null, sw.getPort((int)2));
         assertEquals(null, sw.getPort("port2"));
         assertEquals(null, sw.getPort("PoRt2")); // case insensitive get
 
@@ -964,7 +964,7 @@ public class OFSwitchBaseTest {
         expectedChanges.clear();
         expectedChanges.add(evP3Add);
 
-        ps.setReason(OFPortReason.OFPPR_ADD.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_ADD);
         ps.setDesc(p3.toOFPhysicalPort());
 
         actualChanges = sw.processOFPortStatus(ps);
@@ -973,19 +973,19 @@ public class OFSwitchBaseTest {
         enabledPorts.clear();
         enabledPorts.add(p3);
         enabledPortNumbers.clear();
-        enabledPortNumbers.add((short)3);
+        enabledPortNumbers.add((int)3);
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(null, sw.getPort((short)1));
+        assertEquals(null, sw.getPort((int)1));
         assertEquals(null, sw.getPort("port1"));
         assertEquals(null, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(null, sw.getPort((short)2));
+        assertEquals(null, sw.getPort((int)2));
         assertEquals(null, sw.getPort("port2"));
         assertEquals(null, sw.getPort("PoRt2")); // case insensitive get
 
-        assertEquals(p3, sw.getPort((short)3));
+        assertEquals(p3, sw.getPort((int)3));
         assertEquals(p3, sw.getPort("port3"));
         assertEquals(p3, sw.getPort("PoRt3")); // case insensitive get
 
@@ -1001,7 +1001,7 @@ public class OFSwitchBaseTest {
         expectedChanges.add(evP1bAdd);
 
         // use a modify to add the port
-        ps.setReason(OFPortReason.OFPPR_MODIFY.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_MODIFY);
         ps.setDesc(p1b.toOFPhysicalPort());
 
         actualChanges = sw.processOFPortStatus(ps);
@@ -1011,20 +1011,20 @@ public class OFSwitchBaseTest {
         enabledPorts.add(p3);
         enabledPorts.add(p1b);
         enabledPortNumbers.clear();
-        enabledPortNumbers.add((short)3);
-        enabledPortNumbers.add((short)1);
+        enabledPortNumbers.add((int)3);
+        enabledPortNumbers.add((int)1);
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(p1b, sw.getPort((short)1));
+        assertEquals(p1b, sw.getPort((int)1));
         assertEquals(p1b, sw.getPort("port1"));
         assertEquals(p1b, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(null, sw.getPort((short)2));
+        assertEquals(null, sw.getPort((int)2));
         assertEquals(null, sw.getPort("port2"));
         assertEquals(null, sw.getPort("PoRt2")); // case insensitive get
 
-        assertEquals(p3, sw.getPort((short)3));
+        assertEquals(p3, sw.getPort((int)3));
         assertEquals(p3, sw.getPort("port3"));
         assertEquals(p3, sw.getPort("PoRt3")); // case insensitive get
 
@@ -1037,7 +1037,7 @@ public class OFSwitchBaseTest {
         expectedChanges.clear();
 
         // use a modify to add the port
-        ps.setReason(OFPortReason.OFPPR_MODIFY.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_MODIFY.ordinal());
         ps.setDesc(p1b.toOFPhysicalPort());
 
         actualChanges = sw.processOFPortStatus(ps);
@@ -1047,20 +1047,20 @@ public class OFSwitchBaseTest {
         enabledPorts.add(p3);
         enabledPorts.add(p1b);
         enabledPortNumbers.clear();
-        enabledPortNumbers.add((short)3);
-        enabledPortNumbers.add((short)1);
+        enabledPortNumbers.add((int)3);
+        enabledPortNumbers.add((int)1);
         assertCollectionEqualsNoOrder(enabledPorts, sw.getEnabledPorts());
         assertCollectionEqualsNoOrder(enabledPortNumbers,
                                    sw.getEnabledPortNumbers());
-        assertEquals(p1b, sw.getPort((short)1));
+        assertEquals(p1b, sw.getPort((int)1));
         assertEquals(p1b, sw.getPort("port1"));
         assertEquals(p1b, sw.getPort("PoRt1")); // case insensitive get
 
-        assertEquals(null, sw.getPort((short)2));
+        assertEquals(null, sw.getPort((int)2));
         assertEquals(null, sw.getPort("port2"));
         assertEquals(null, sw.getPort("PoRt2")); // case insensitive get
 
-        assertEquals(p3, sw.getPort((short)3));
+        assertEquals(p3, sw.getPort((int)3));
         assertEquals(p3, sw.getPort("port3"));
         assertEquals(p3, sw.getPort("PoRt3")); // case insensitive get
     }
@@ -1078,8 +1078,8 @@ public class OFSwitchBaseTest {
 
         // two ports with same name
         List<ImmutablePort> ports = new ArrayList<ImmutablePort>();
-        ports.add(ImmutablePort.create("port1", (short)1));
-        ports.add(ImmutablePort.create("port1", (short)2));
+        ports.add(ImmutablePort.create("port1", (int)1));
+        ports.add(ImmutablePort.create("port1", (int)2));
         try {
             sw.setPorts(ports);
             fail("Excpeted exception not thrown");
@@ -1087,8 +1087,8 @@ public class OFSwitchBaseTest {
 
         // two ports with same number
         ports.clear();
-        ports.add(ImmutablePort.create("port1", (short)1));
-        ports.add(ImmutablePort.create("port2", (short)1));
+        ports.add(ImmutablePort.create("port1", (int)1));
+        ports.add(ImmutablePort.create("port2", (int)1));
         try {
             sw.setPorts(ports);
             fail("Excpeted exception not thrown");
@@ -1096,7 +1096,7 @@ public class OFSwitchBaseTest {
 
         // null port in list
         ports.clear();
-        ports.add(ImmutablePort.create("port1", (short)1));
+        ports.add(ImmutablePort.create("port1", (int)1));
         ports.add(null);
         try {
             sw.setPorts(ports);
@@ -1118,8 +1118,8 @@ public class OFSwitchBaseTest {
 
         // two ports with same name
         ports = new ArrayList<ImmutablePort>();
-        ports.add(ImmutablePort.create("port1", (short)1));
-        ports.add(ImmutablePort.create("port1", (short)2));
+        ports.add(ImmutablePort.create("port1", (int)1));
+        ports.add(ImmutablePort.create("port1", (int)2));
         try {
             sw.comparePorts(ports);
             fail("Excpeted exception not thrown");
@@ -1127,8 +1127,8 @@ public class OFSwitchBaseTest {
 
         // two ports with same number
         ports.clear();
-        ports.add(ImmutablePort.create("port1", (short)1));
-        ports.add(ImmutablePort.create("port2", (short)1));
+        ports.add(ImmutablePort.create("port1", (int)1));
+        ports.add(ImmutablePort.create("port2", (int)1));
         try {
             sw.comparePorts(ports);
             fail("Excpeted exception not thrown");
@@ -1136,7 +1136,7 @@ public class OFSwitchBaseTest {
 
         // null port in list
         ports.clear();
-        ports.add(ImmutablePort.create("port1", (short)1));
+        ports.add(ImmutablePort.create("port1", (int)1));
         ports.add(null);
         try {
             sw.comparePorts(ports);
@@ -1154,7 +1154,7 @@ public class OFSwitchBaseTest {
     @Test
     public void testPortStatusExceptions() {
         OFPortStatus ps = (OFPortStatus)
-                BasicFactory.getInstance().getMessage(OFType.PORT_STATUS);
+                FloodlightFactory.getInstance().getMessage(OFType.PORT_STATUS);
 
         try {
             sw.processOFPortStatus(null);
@@ -1163,14 +1163,14 @@ public class OFSwitchBaseTest {
 
         // illegal reason code
         ps.setReason((byte)0x42);
-        ps.setDesc(ImmutablePort.create("p1", (short)1).toOFPhysicalPort());
+        ps.setDesc(ImmutablePort.create("p1", (int)1).toOFPhysicalPort());
         try {
             sw.processOFPortStatus(ps);
             fail("Expected exception not thrown");
         } catch (IllegalArgumentException e)  { }
 
         // null port
-        ps.setReason(OFPortReason.OFPPR_ADD.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_ADD.ordinal());
         ps.setDesc(null);
         try {
             sw.processOFPortStatus(ps);
@@ -1377,10 +1377,10 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(ports, sw.getPorts());
 
         OFPortStatus ps = (OFPortStatus)
-                BasicFactory.getInstance().getMessage(OFType.PORT_STATUS);
+                FloodlightFactory.getInstance().getMessage(OFType.PORT_STATUS);
 
         // portFoo1 -> portFoo2 via MODIFY : name collision
-        ps.setReason(OFPortReason.OFPPR_MODIFY.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_MODIFY.ordinal());
         ps.setDesc(portFoo2.toOFPhysicalPort());
         ports.clear();
         ports.add(portFoo2);
@@ -1395,7 +1395,7 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(ports, sw.getPorts());
 
         // portFoo2 -> portBar2 via ADD number collision
-        ps.setReason(OFPortReason.OFPPR_ADD.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_ADD.ordinal());
         ps.setDesc(portBar2.toOFPhysicalPort());
         ports.clear();
         ports.add(portBar2);
@@ -1417,7 +1417,7 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(ports, sw.getPorts());
 
         // portFoo1 + portBar2 -> portFoo2: name and number collision
-        ps.setReason(OFPortReason.OFPPR_MODIFY.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_MODIFY.ordinal());
         ps.setDesc(portFoo2.toOFPhysicalPort());
         ports.clear();
         ports.add(portFoo2);
@@ -1435,7 +1435,7 @@ public class OFSwitchBaseTest {
         // Test DELETEs
 
         // del portFoo1: name exists (portFoo2), but number doesn't.
-        ps.setReason(OFPortReason.OFPPR_DELETE.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_DELETE.ordinal());
         ps.setDesc(portFoo1.toOFPhysicalPort());
         ports.clear();
         early.clear();
@@ -1453,7 +1453,7 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(ports, sw.getPorts());
 
         // del portBar1: number exists (portFoo1), but name doesn't.
-        ps.setReason(OFPortReason.OFPPR_DELETE.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_DELETE.ordinal());
         ps.setDesc(portBar1.toOFPhysicalPort());
         ports.clear();
         early.clear();
@@ -1473,7 +1473,7 @@ public class OFSwitchBaseTest {
         assertCollectionEqualsNoOrder(ports, sw.getPorts());
 
         // del portFoo2: name and number exists
-        ps.setReason(OFPortReason.OFPPR_DELETE.getReasonCode());
+        ps.setReason(OFPortReason.OFPPR_DELETE);
         ps.setDesc(portFoo2.toOFPhysicalPort());
         ports.clear();
         early.clear();
@@ -1488,7 +1488,7 @@ public class OFSwitchBaseTest {
 
     @Test
     public void testSubHandshake() {
-        OFMessage m = BasicFactory.getInstance().getMessage(OFType.VENDOR);
+        OFMessage m = FloodlightFactory.getInstance().getMessage(OFType.VENDOR);
         // test execptions before handshake is started
         try {
             sw.processDriverHandshakeMessage(m);

@@ -27,5 +27,5 @@ public interface ILearningSwitchService extends IFloodlightService {
      * Returns the LearningSwitch's learned host table
      * @return The learned host table
      */
-    public Map<IOFSwitch, Map<MacVlanPair,Short>> getTable();
+    public Map<IOFSwitch, Map<MacVlanPair,Integer>> getTable();
 }

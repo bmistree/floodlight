@@ -1,34 +1,7 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.concurrent.ConcurrentHashMap;
+import java.nio.ByteBuffer;
 
-import net.floodlightcontroller.core.FloodlightContext;
-import net.floodlightcontroller.core.IFloodlightProviderService;
-import net.floodlightcontroller.core.IOFSwitch;
-import net.floodlightcontroller.packet.Ethernet;
-
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.openflow.util.HexString;
 import org.openflow.util.U16;
 import org.openflow.util.U32;
 import org.openflow.util.U8;
@@ -41,8 +14,7 @@ import org.openflow.util.U8;
  * @author Rob Sherwood (rob.sherwood@stanford.edu) - Feb 3, 2010
  */
 public class OFMessage {
-    public static final int MAXIMUM_LENGTH = (1 << 16) - 1;
-    public static byte OFP_VERSION = 0x01;
+    public static byte OFP_VERSION = 0x04;
     public static int MINIMUM_LENGTH = 8;
 
     protected byte version;
@@ -50,18 +22,9 @@ public class OFMessage {
     protected short length;
     protected int xid;
 
-    private ConcurrentHashMap<String, Object> storage;
-
     public OFMessage() {
-        storage = null;
         this.version = OFP_VERSION;
-    }
-
-    protected synchronized ConcurrentHashMap<String, Object> getMessageStore() {
-        if (storage == null) {
-            storage = new ConcurrentHashMap<String, Object>();;
-        }
-        return storage;
+        this.length = U16.t(MINIMUM_LENGTH);
     }
 
     /**
@@ -116,8 +79,9 @@ public class OFMessage {
      *
      * @param type
      */
-    public void setType(OFType type) {
+    public OFMessage setType(OFType type) {
         this.type = type;
+        return this;
     }
 
     /**
@@ -134,8 +98,9 @@ public class OFMessage {
      *
      * @param version
      */
-    public void setVersion(byte version) {
+    public OFMessage setVersion(byte version) {
         this.version = version;
+        return this;
     }
 
     /**
@@ -152,37 +117,48 @@ public class OFMessage {
      *
      * @param xid
      */
-    public void setXid(int xid) {
+    public OFMessage setXid(int xid) {
         this.xid = xid;
+        return this;
     }
 
     /**
      * Read this message off the wire from the specified ByteBuffer
      * @param data
      */
-    public void readFrom(ChannelBuffer data) {
-        this.version = data.readByte();
-        this.type = OFType.valueOf(data.readByte());
-        this.length = data.readShort();
-        this.xid = data.readInt();
+    public void readFrom(ByteBuffer data) {
+        this.version = data.get();
+        this.type = OFType.valueOf(data.get());
+        this.length = data.getShort();
+        this.xid = data.getInt();
     }
 
     /**
      * Write this message's binary format to the specified ByteBuffer
      * @param data
      */
-    public void writeTo(ChannelBuffer data) {
-        data.writeByte(version);
-        data.writeByte(type.getTypeValue());
-        data.writeShort(length);
-        data.writeInt(xid);
+    public void writeTo(ByteBuffer data) {
+        computeLength();
+        data.put(version);
+        data.put(type.getTypeValue());
+        data.putShort(length);
+        data.putInt(xid);
+    }
+
+    /**
+     * This method is called during the writeTo method for serialization and
+     * is expected to set the length of the message. If your class manually
+     * sets the length you should override this to do nothing.
+     *
+     */
+    public void computeLength() {
+        this.length = (short) MINIMUM_LENGTH;
     }
 
     /**
      * Returns a summary of the message
      * @return "ofmsg=v=$version;t=$type:l=$len:xid=$xid"
      */
-    @Override
     public String toString() {
         return "ofmsg" +
             ":v=" + U8.f(this.getVersion()) +
@@ -231,106 +207,5 @@ public class OFMessage {
             return false;
         }
         return true;
-    }
-
-    public static String getDataAsString(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
-
-        Ethernet eth;
-        StringBuffer sb =  new StringBuffer("");
-
-        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
-        Date date = new Date();
-
-        sb.append(dateFormat.format(date));
-        sb.append("      ");
-
-        switch (msg.getType()) {
-            case PACKET_IN:
-                OFPacketIn pktIn = (OFPacketIn) msg;
-                sb.append("packet_in          [ ");
-                sb.append(sw.getStringId());
-                sb.append(" -> Controller");
-                sb.append(" ]");
-
-                sb.append("\ntotal length: ");
-                sb.append(pktIn.getTotalLength());
-                sb.append("\nin_port: ");
-                sb.append(pktIn.getInPort());
-                sb.append("\ndata_length: ");
-                sb.append(pktIn.getTotalLength() - OFPacketIn.MINIMUM_LENGTH);
-                sb.append("\nbuffer: ");
-                sb.append(pktIn.getBufferId());
-
-                // If the conext is not set by floodlight, then ignore.
-                if (cntx != null) {
-                // packet type  icmp, arp, etc.
-                    eth = IFloodlightProviderService.bcStore.get(cntx,
-                            IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
-                    if (eth != null)
-                           sb.append(eth.toString());
-                }
-                break;
-
-            case PACKET_OUT:
-                OFPacketOut pktOut = (OFPacketOut) msg;
-                sb.append("packet_out         [ ");
-                sb.append("Controller -> ");
-                sb.append(HexString.toHexString(sw.getId()));
-                sb.append(" ]");
-
-                sb.append("\nin_port: ");
-                sb.append(pktOut.getInPort());
-                sb.append("\nactions_len: ");
-                sb.append(pktOut.getActionsLength());
-                if (pktOut.getActions() != null) {
-                    sb.append("\nactions: ");
-                    sb.append(pktOut.getActions().toString());
-                }
-                break;
-
-            case FLOW_MOD:
-                OFFlowMod fm = (OFFlowMod) msg;
-                sb.append("flow_mod           [ ");
-                sb.append("Controller -> ");
-                sb.append(HexString.toHexString(sw.getId()));
-                sb.append(" ]");
-
-                // If the conext is not set by floodlight, then ignore.
-                if (cntx != null) {
-                    eth = IFloodlightProviderService.bcStore.get(cntx,
-                        IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
-                    if (eth != null)
-                        sb.append(eth.toString());
-                }
-
-                sb.append("\nADD: cookie: ");
-                sb.append(fm.getCookie());
-                sb.append(" idle: ");
-                sb.append(fm.getIdleTimeout());
-                sb.append(" hard: ");
-                sb.append(fm.getHardTimeout());
-                sb.append(" pri: ");
-                sb.append(fm.getPriority());
-                sb.append(" buf: ");
-                sb.append(fm.getBufferId());
-                sb.append(" flg: ");
-                sb.append(fm.getFlags());
-                if (fm.getActions() != null) {
-                    sb.append("\nactions: ");
-                    sb.append(fm.getActions().toString());
-                }
-                break;
-
-            default:
-                sb.append("[Unknown Packet]");
-        }
-
-        sb.append("\n\n");
-        return sb.toString();
-
-    }
-
-    public static byte[] getData(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
-        return OFMessage.getDataAsString(sw, msg, cntx).getBytes();
     }
 }

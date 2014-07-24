@@ -49,9 +49,9 @@ import net.floodlightcontroller.servicechaining.ServiceChain;
 @LogMessageCategory("Network Topology")
 public class TopologyInstance {
 
-    public static final short LT_SH_LINK = 1;
-    public static final short LT_BD_LINK = 2;
-    public static final short LT_TUNNEL  = 3;
+    public static final int LT_SH_LINK = 1;
+    public static final int LT_BD_LINK = 2;
+    public static final int LT_TUNNEL  = 3;
 
     public static final int MAX_LINK_WEIGHT = 10000;
     public static final int MAX_PATH_WEIGHT = Integer.MAX_VALUE - MAX_LINK_WEIGHT - 1;
@@ -59,7 +59,7 @@ public class TopologyInstance {
 
     protected static Logger log = LoggerFactory.getLogger(TopologyInstance.class);
 
-    protected Map<Long, Set<Short>> switchPorts; // Set of ports for each switch
+    protected Map<Long, Set<Integer>> switchPorts; // Set of ports for each switch
     /** Set of switch ports that are marked as blocked.  A set of blocked
      * switch ports may be provided at the time of instantiation. In addition,
      * we may add additional ports to this set.
@@ -100,7 +100,7 @@ public class TopologyInstance {
 
     public TopologyInstance() {
         this.switches = new HashSet<Long>();
-        this.switchPorts = new HashMap<Long, Set<Short>>();
+        this.switchPorts = new HashMap<Long, Set<Integer>>();
         this.switchPortLinks = new HashMap<NodePortTuple, Set<Link>>();
         this.broadcastDomainPorts = new HashSet<NodePortTuple>();
         this.tunnelPorts = new HashSet<NodePortTuple>();
@@ -108,12 +108,12 @@ public class TopologyInstance {
         this.blockedLinks = new HashSet<Link>();
     }
 
-    public TopologyInstance(Map<Long, Set<Short>> switchPorts,
+    public TopologyInstance(Map<Long, Set<Integer>> switchPorts,
                             Map<NodePortTuple, Set<Link>> switchPortLinks,
                             Set<NodePortTuple> broadcastDomainPorts)
     {
         this.switches = new HashSet<Long>(switchPorts.keySet());
-        this.switchPorts = new HashMap<Long, Set<Short>>(switchPorts);
+        this.switchPorts = new HashMap<Long, Set<Integer>>(switchPorts);
         this.switchPortLinks = new HashMap<NodePortTuple,
                 Set<Link>>(switchPortLinks);
         this.broadcastDomainPorts = new HashSet<NodePortTuple>(broadcastDomainPorts);
@@ -124,7 +124,7 @@ public class TopologyInstance {
         clusters = new HashSet<Cluster>();
         switchClusterMap = new HashMap<Long, Cluster>();
     }
-    public TopologyInstance(Map<Long, Set<Short>> switchPorts,
+    public TopologyInstance(Map<Long, Set<Integer>> switchPorts,
                             Set<NodePortTuple> blockedPorts,
                             Map<NodePortTuple, Set<Link>> switchPortLinks,
                             Set<NodePortTuple> broadcastDomainPorts,
@@ -132,9 +132,9 @@ public class TopologyInstance {
 
         // copy these structures
         this.switches = new HashSet<Long>(switchPorts.keySet());
-        this.switchPorts = new HashMap<Long, Set<Short>>();
+        this.switchPorts = new HashMap<Long, Set<Integer>>();
         for(long sw: switchPorts.keySet()) {
-            this.switchPorts.put(sw, new HashSet<Short>(switchPorts.get(sw)));
+            this.switchPorts.put(sw, new HashSet<Integer>(switchPorts.get(sw)));
         }
 
         this.blockedPorts = new HashSet<NodePortTuple>(blockedPorts);
@@ -206,7 +206,7 @@ public class TopologyInstance {
     protected void addLinksToOpenflowDomains() {
         for(long s: switches) {
             if (switchPorts.get(s) == null) continue;
-            for (short p: switchPorts.get(s)) {
+            for (int p: switchPorts.get(s)) {
                 NodePortTuple np = new NodePortTuple(s, p);
                 if (switchPortLinks.get(np) == null) continue;
                 if (isBroadcastDomainPort(np)) continue;
@@ -309,7 +309,7 @@ public class TopologyInstance {
 
         // Traverse the graph through every outgoing link.
         if (switchPorts.get(currSw) != null){
-            for(Short p: switchPorts.get(currSw)) {
+            for(Integer p: switchPorts.get(currSw)) {
                 Set<Link> lset = switchPortLinks.get(new NodePortTuple(currSw, p));
                 if (lset == null) continue;
                 for(Link l:lset) {
@@ -663,8 +663,8 @@ public class TopologyInstance {
         return true;
     }
 
-    protected Route getRoute(ServiceChain sc, long srcId, short srcPort,
-                             long dstId, short dstPort, long cookie) {
+    protected Route getRoute(ServiceChain sc, long srcId, int srcPort,
+                             long dstId, int dstPort, long cookie) {
 
 
         // Return null the route source and desitnation are the
@@ -725,11 +725,11 @@ public class TopologyInstance {
     //  ITopologyService interface method helpers.
     //
 
-    protected boolean isInternalToOpenflowDomain(long switchid, short port) {
+    protected boolean isInternalToOpenflowDomain(long switchid, int port) {
         return !isAttachmentPointPort(switchid, port);
     }
 
-    public boolean isAttachmentPointPort(long switchid, short port) {
+    public boolean isAttachmentPointPort(long switchid, int port) {
         NodePortTuple npt = new NodePortTuple(switchid, port);
         if (switchPortLinks.containsKey(npt)) return false;
         return true;
@@ -765,12 +765,12 @@ public class TopologyInstance {
         return (switch1 == switch2);
     }
 
-    public boolean isAllowed(long sw, short portId) {
+    public boolean isAllowed(long sw, int portId) {
         return true;
     }
 
     protected boolean
-    isIncomingBroadcastAllowedOnSwitchPort(long sw, short portId) {
+    isIncomingBroadcastAllowedOnSwitchPort(long sw, int portId) {
         if (isInternalToOpenflowDomain(sw, portId)) {
             long clusterId = getOpenflowDomainId(sw);
             NodePortTuple npt = new NodePortTuple(sw, portId);
@@ -781,8 +781,8 @@ public class TopologyInstance {
         return true;
     }
 
-    public boolean isConsistent(long oldSw, short oldPort, long newSw,
-                                short newPort) {
+    public boolean isConsistent(long oldSw, int oldPort, long newSw,
+                                int newPort) {
         if (isInternalToOpenflowDomain(newSw, newPort)) return true;
         return (oldSw == newSw && oldPort == newPort);
     }
@@ -793,7 +793,7 @@ public class TopologyInstance {
         return clusterBroadcastNodePorts.get(clusterId);
     }
 
-    public boolean inSameBroadcastDomain(long s1, short p1, long s2, short p2) {
+    public boolean inSameBroadcastDomain(long s1, int p1, long s2, int p2) {
         return false;
     }
 
@@ -801,14 +801,14 @@ public class TopologyInstance {
         return inSameOpenflowDomain(switch1, switch2);
     }
 
-    public NodePortTuple getOutgoingSwitchPort(long src, short srcPort,
-                                               long dst, short dstPort) {
+    public NodePortTuple getOutgoingSwitchPort(long src, int srcPort,
+                                               long dst, int dstPort) {
         // Use this function to redirect traffic if needed.
         return new NodePortTuple(dst, dstPort);
     }
 
-    public NodePortTuple getIncomingSwitchPort(long src, short srcPort,
-                                               long dst, short dstPort) {
+    public NodePortTuple getIncomingSwitchPort(long src, int srcPort,
+                                               long dst, int dstPort) {
         // Use this function to reinject traffic from a
         // different port if needed.
         return new NodePortTuple(src, srcPort);
@@ -818,12 +818,12 @@ public class TopologyInstance {
         return switches;
     }
 
-    public Set<Short> getPortsWithLinks(long sw) {
+    public Set<Integer> getPortsWithLinks(long sw) {
         return switchPorts.get(sw);
     }
 
-    public Set<Short> getBroadcastPorts(long targetSw, long src, short srcPort) {
-        Set<Short> result = new HashSet<Short>();
+    public Set<Integer> getBroadcastPorts(long targetSw, long src, int srcPort) {
+        Set<Integer> result = new HashSet<Integer>();
         long clusterId = getOpenflowDomainId(targetSw);
         for(NodePortTuple npt: clusterBroadcastNodePorts.get(clusterId)) {
             if (npt.getNodeId() == targetSw) {
@@ -834,14 +834,14 @@ public class TopologyInstance {
     }
 
     public NodePortTuple
-    getAllowedOutgoingBroadcastPort(long src, short srcPort, long dst,
-                                    short dstPort) {
+    getAllowedOutgoingBroadcastPort(long src, int srcPort, long dst,
+                                    int dstPort) {
         // TODO Auto-generated method stub
         return null;
     }
 
     public NodePortTuple
-    getAllowedIncomingBroadcastPort(long src, short srcPort) {
+    getAllowedIncomingBroadcastPort(long src, int srcPort) {
         // TODO Auto-generated method stub
         return null;
     }

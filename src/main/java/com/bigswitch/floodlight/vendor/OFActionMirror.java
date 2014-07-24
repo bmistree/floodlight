@@ -1,6 +1,6 @@
 package com.bigswitch.floodlight.vendor;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 
 
 public class OFActionMirror extends OFActionBigSwitchVendor {
@@ -14,7 +14,7 @@ public class OFActionMirror extends OFActionBigSwitchVendor {
     protected byte pad1;
     protected byte pad2;
 
-    public OFActionMirror(short portNumber) {
+    public OFActionMirror(int portNumber) {
         super(BSN_ACTION_MIRROR);
         super.setLength((short) (OFActionBigSwitchVendor.MINIMUM_LENGTH + OFActionMirror.MINIMUM_LENGTH));
         this.destPort = portNumber;
@@ -75,25 +75,25 @@ public class OFActionMirror extends OFActionBigSwitchVendor {
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        this.destPort = data.readInt();
-        this.vlanTag = data.readInt();
-        this.copyStage = data.readByte();
-        this.pad0 = data.readByte();
-        this.pad1 = data.readByte();
-        this.pad2 = data.readByte();
+        this.destPort = data.getInt();
+        this.vlanTag = data.getInt();
+        this.copyStage = data.get();
+        this.pad0 = data.get();
+        this.pad1 = data.get();
+        this.pad2 = data.get();
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeInt(this.destPort);
-        data.writeInt(this.vlanTag);
-        data.writeByte(this.copyStage);
-        data.writeByte(this.pad0);
-        data.writeByte(this.pad1);
-        data.writeByte(this.pad2);
+        data.getInt(this.destPort);
+        data.getInt(this.vlanTag);
+        data.get(this.copyStage);
+        data.get(this.pad0);
+        data.get(this.pad1);
+        data.get(this.pad2);
     }
 
     @Override

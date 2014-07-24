@@ -17,7 +17,7 @@
 
 package org.openflow.vendor.nicira;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 
 /**
  * Class that represents the vendor data in the role request
@@ -93,21 +93,21 @@ public class OFRoleVendorData extends OFNiciraVendorData {
     }
     
     /**
-     * Read the role vendor data from the ChannelBuffer
+     * Read the role vendor data from the ByteBuffer
      * @param data the channel buffer from which we're deserializing
      * @param length the length to the end of the enclosing message
      */
-    public void readFrom(ChannelBuffer data, int length) {
+    public void readFrom(ByteBuffer data, int length) {
         super.readFrom(data, length);
-        role = data.readInt();
+        role = data.getInt();
     }
 
     /**
-     * Write the role vendor data to the ChannelBuffer
+     * Write the role vendor data to the ByteBuffer
      * @param data the channel buffer to which we're serializing
      */
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeInt(role);
+        data.putInt(role);
     }
 }

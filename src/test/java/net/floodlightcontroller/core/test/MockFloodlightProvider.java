@@ -55,7 +55,7 @@ import net.floodlightcontroller.packet.Ethernet;
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFPacketIn;
 import org.openflow.protocol.OFType;
-import org.openflow.protocol.factory.BasicFactory;
+import org.openflow.protocol.factory.FloodlightFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +69,7 @@ public class MockFloodlightProvider implements IFloodlightModule, IFloodlightPro
     protected List<IOFSwitchListener> switchListeners;
     protected ListenerDispatcher<HAListenerTypeMarker, IHAListener> haListeners;
     protected Map<Long, IOFSwitch> switches;
-    protected BasicFactory factory;
+    protected FloodlightFactory factory;
     private Role role;
 
     /**
@@ -82,7 +82,7 @@ public class MockFloodlightProvider implements IFloodlightModule, IFloodlightPro
         switchListeners = new CopyOnWriteArrayList<IOFSwitchListener>();
         haListeners =
                 new ListenerDispatcher<HAListenerTypeMarker, IHAListener>();
-        factory = BasicFactory.getInstance();
+        factory = FloodlightFactory.getInstance();
         role = null;
     }
 
@@ -227,7 +227,7 @@ public class MockFloodlightProvider implements IFloodlightModule, IFloodlightPro
     }
 
     @Override
-    public BasicFactory getOFMessageFactory() {
+    public FloodlightFactory getOFMessageFactory() {
         return factory;
     }
 

@@ -17,7 +17,6 @@ package net.floodlightcontroller.flowcache;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,7 +97,7 @@ public class PortDownReconciliation implements IFloodlightModule,
                 OFMatchReconcile ofmr = new OFMatchReconcile();
 
                 // Generate an OFMatch objects for the OFMatchWithSwDpid object
-                OFMatch match = new OFMatch().setWildcards(OFMatch.OFPFW_ALL);
+                OFMatch match = new OFMatch();
 
                 // Generate the OFMatchWithSwDpid
                 OFMatchWithSwDpid ofmatchsw = new OFMatchWithSwDpid(match,
@@ -202,7 +201,7 @@ public class PortDownReconciliation implements IFloodlightModule,
 
                     // Map data structure that holds the invalid matches and the
                     // ingress ports of those matches
-                    Map<Short, List<OFMatch>> invalidBaseIngressAndMatches = new HashMap<Short, List<OFMatch>>();
+                    Map<Integer, List<OFMatch>> invalidBaseIngressAndMatches = new HashMap<Integer, List<OFMatch>>();
 
                     // Get the invalid flows
                     List<OFFlowStatisticsReply> flows = getFlows(sw,
@@ -216,17 +215,17 @@ public class PortDownReconciliation implements IFloodlightModule,
 
                         // Here we utilize an index of input ports which point
                         // to multiple invalid matches
-                        if (invalidBaseIngressAndMatches.containsKey(match.getInputPort()))
+                        if (invalidBaseIngressAndMatches.containsKey(match.getInPort()))
                             // If the input port is already in the index, add
                             // the match to it's list
-                            invalidBaseIngressAndMatches.get(match.getInputPort())
+                            invalidBaseIngressAndMatches.get(match.getInPort())
                                                         .add(match);
                         else {
                             // Otherwise create a new list and add it to the
                             // index
                             List<OFMatch> matches = new ArrayList<OFMatch>();
                             matches.add(match);
-                            invalidBaseIngressAndMatches.put(match.getInputPort(),
+                            invalidBaseIngressAndMatches.put(match.getInPort(),
                                                              matches);
                         }
                     }
@@ -240,7 +239,7 @@ public class PortDownReconciliation implements IFloodlightModule,
 
                     // Create a list of neighboring switches we need to remove
                     // invalid flows from
-                    Map<IOFSwitch, Map<Short, List<OFMatch>>> neighborSwitches = new HashMap<IOFSwitch, Map<Short, List<OFMatch>>>();
+                    Map<IOFSwitch, Map<Integer, List<OFMatch>>> neighborSwitches = new HashMap<IOFSwitch, Map<Integer, List<OFMatch>>>();
 
                     // Loop through all the links
                     for (Link link : links.keySet()) {
@@ -248,12 +247,12 @@ public class PortDownReconciliation implements IFloodlightModule,
                         if (link.getDst() == sw.getId()) {
                             // Loop through the links to neighboring switches
                             // which have invalid flows
-                            for (Entry<Short, List<OFMatch>> invalidBaseIngressAndMatch : invalidBaseIngressAndMatches.entrySet()) {
+                            for (Entry<Integer, List<OFMatch>> invalidBaseIngressAndMatch : invalidBaseIngressAndMatches.entrySet()) {
                                 // Find links on the network which link to the
                                 // ingress ports that have invalidly routed
                                 // flows
                                 if (link.getDstPort() == invalidBaseIngressAndMatch.getKey()) {
-                                    Map<Short, List<OFMatch>> invalidNeighborOutportAndMatch = new HashMap<Short, List<OFMatch>>();
+                                    Map<Integer, List<OFMatch>> invalidNeighborOutportAndMatch = new HashMap<Integer, List<OFMatch>>();
                                     // Insert the neighbor's outPort to the base
                                     // switch and the invalid match
                                     invalidNeighborOutportAndMatch.put(link.getSrcPort(),
@@ -274,8 +273,8 @@ public class PortDownReconciliation implements IFloodlightModule,
                         log.debug("NeighborSwitch ID : "
                                   + neighborSwitch.getId());
                         if (neighborSwitches.get(neighborSwitch) != null)
-                                                                         deleteInvalidFlows(neighborSwitch,
-                                                                                            neighborSwitches.get(neighborSwitch));
+                             deleteInvalidFlows(neighborSwitch,
+                                                neighborSwitches.get(neighborSwitch));
                     }
                 }
                 return Command.CONTINUE;
@@ -293,7 +292,7 @@ public class PortDownReconciliation implements IFloodlightModule,
      *            the output action port we wish to find flows with
      * @return a list of OFFlowStatisticsReply objects or essentially flows
      */
-    public List<OFFlowStatisticsReply> getFlows(IOFSwitch sw, Short outPort) {
+    public List<OFFlowStatisticsReply> getFlows(IOFSwitch sw, Integer outPort) {
 
         statsReply = new ArrayList<OFFlowStatisticsReply>();
         List<OFStatistics> values = null;
@@ -301,13 +300,13 @@ public class PortDownReconciliation implements IFloodlightModule,
 
         // Statistics request object for getting flows
         OFStatisticsRequest req = new OFStatisticsRequest();
-        req.setStatisticType(OFStatisticsType.FLOW);
+        req.setStatisticsType(OFStatisticsType.FLOW);
         int requestLength = req.getLengthU();
         OFFlowStatisticsRequest specificReq = new OFFlowStatisticsRequest();
-        specificReq.setMatch(new OFMatch().setWildcards(0xffffffff));
+        specificReq.setMatch(new OFMatch());
         specificReq.setOutPort(outPort);
         specificReq.setTableId((byte) 0xff);
-        req.setStatistics(Collections.singletonList((OFStatistics) specificReq));
+        req.setStatistics(specificReq);
         requestLength += specificReq.getLength();
         req.setLengthU(requestLength);
 
@@ -334,10 +333,10 @@ public class PortDownReconciliation implements IFloodlightModule,
      *            The specific Output Action OutPort of specific flows we wish
      *            to delete
      */
-    public void clearFlowMods(IOFSwitch sw, Short outPort) {
+    public void clearFlowMods(IOFSwitch sw, Integer outPort) {
         // Delete all pre-existing flows with the same output action port or
         // outPort
-        OFMatch match = new OFMatch().setWildcards(OFMatch.OFPFW_ALL);
+        OFMatch match = new OFMatch();
         OFMessage fm = ((OFFlowMod) floodlightProvider.getOFMessageFactory()
                                                       .getMessage(OFType.FLOW_MOD)).setMatch(match)
                                                                                    .setCommand(OFFlowMod.OFPFC_DELETE)
@@ -362,10 +361,10 @@ public class PortDownReconciliation implements IFloodlightModule,
      *            The specific Output Action OutPort of specific flows we wish
      *            to delete
      */
-    public void clearFlowMods(IOFSwitch sw, OFMatch match, Short outPort) {
+    public void clearFlowMods(IOFSwitch sw, OFMatch match, Integer outPort) {
         // Delete pre-existing flows with the same match, and output action port
         // or outPort
-        match.setWildcards(OFMatch.OFPFW_ALL);
+        match.setNonWildcards(null);
         OFMessage fm = ((OFFlowMod) floodlightProvider.getOFMessageFactory()
                                                       .getMessage(OFType.FLOW_MOD)).setMatch(match)
                                                                                    .setCommand(OFFlowMod.OFPFC_DELETE)
@@ -396,13 +395,13 @@ public class PortDownReconciliation implements IFloodlightModule,
     public
             void
             deleteInvalidFlows(IOFSwitch sw,
-                               Map<Short, List<OFMatch>> invalidOutportAndMatch) {
+                               Map<Integer, List<OFMatch>> invalidOutportAndMatch) {
         log.debug("Deleting invalid flows on switch : " + sw.getId());
 
         // A map that holds the input ports and invalid matches on a switch
-        Map<Short, List<OFMatch>> invalidNeighborIngressAndMatches = new HashMap<Short, List<OFMatch>>();
+        Map<Integer, List<OFMatch>> invalidNeighborIngressAndMatches = new HashMap<Integer, List<OFMatch>>();
 
-        for (Short outPort : invalidOutportAndMatch.keySet()) {
+        for (Integer outPort : invalidOutportAndMatch.keySet()) {
             // Get the flows on the switch
             List<OFFlowStatisticsReply> flows = getFlows(sw, outPort);
 
@@ -421,25 +420,25 @@ public class PortDownReconciliation implements IFloodlightModule,
                         && flow.getMatch().getDataLayerType() == match.getDataLayerType()
                         && flow.getMatch().getDataLayerVirtualLan() == match.getDataLayerVirtualLan()
                         && flow.getMatch().getNetworkDestination() == match.getNetworkDestination()
-                        && flow.getMatch().getNetworkDestinationMaskLen() == match.getNetworkDestinationMaskLen()
+                        && flow.getMatch().getNetworkDestinationMask() == match.getNetworkDestinationMask()
                         && flow.getMatch().getNetworkProtocol() == match.getNetworkProtocol()
                         && flow.getMatch().getNetworkSource() == match.getNetworkSource()
-                        && flow.getMatch().getNetworkSourceMaskLen() == match.getNetworkSourceMaskLen()
+                        && flow.getMatch().getNetworkSourceMask() == match.getNetworkSourceMask()
                         && flow.getMatch().getNetworkTypeOfService() == match.getNetworkTypeOfService()) {
 
                         // Here we utilize an index of input ports which point
                         // to multiple invalid matches
-                        if (invalidNeighborIngressAndMatches.containsKey(match.getInputPort()))
+                        if (invalidNeighborIngressAndMatches.containsKey(match.getInPort()))
                             // If the input port is already in the index, add
                             // the match to it's list
-                            invalidNeighborIngressAndMatches.get(match.getInputPort())
+                            invalidNeighborIngressAndMatches.get(match.getInPort())
                                                             .add(match);
                         else {
                             // Otherwise create a new list and add it to the
                             // index
                             List<OFMatch> matches = new ArrayList<OFMatch>();
                             matches.add(match);
-                            invalidNeighborIngressAndMatches.put(match.getInputPort(),
+                            invalidNeighborIngressAndMatches.put(match.getInPort(),
                                                                  matches);
                         }
                         // Remove flows from the switch with the invalid match
@@ -451,7 +450,7 @@ public class PortDownReconciliation implements IFloodlightModule,
 
             // Create a list of neighboring switches we need to check for
             // invalid flows
-            Map<IOFSwitch, Map<Short, List<OFMatch>>> neighborSwitches = new HashMap<IOFSwitch, Map<Short, List<OFMatch>>>();
+            Map<IOFSwitch, Map<Integer, List<OFMatch>>> neighborSwitches = new HashMap<IOFSwitch, Map<Integer, List<OFMatch>>>();
 
             // Loop through all the links
             for (Link link : links.keySet()) {
@@ -459,13 +458,13 @@ public class PortDownReconciliation implements IFloodlightModule,
                 if (link.getDst() == sw.getId()) {
                     // Loop through the ingressPorts that are involved in
                     // invalid flows on neighboring switches
-                    for (Entry<Short, List<OFMatch>> ingressPort : invalidNeighborIngressAndMatches.entrySet()) {
+                    for (Entry<Integer, List<OFMatch>> ingressPort : invalidNeighborIngressAndMatches.entrySet()) {
                         // Filter out invalid links by matching the link
                         // destination port to our invalid flows ingress port
                         if (link.getDstPort() == ingressPort.getKey()) {
                             // Generate a match and outPort map since I don't
                             // want to create an object
-                            Map<Short, List<OFMatch>> invalidNeighborOutportAndMatch = new HashMap<Short, List<OFMatch>>();
+                            Map<Integer, List<OFMatch>> invalidNeighborOutportAndMatch = new HashMap<Integer, List<OFMatch>>();
                             invalidNeighborOutportAndMatch.put(link.getSrcPort(),
                                                                ingressPort.getValue());
                             // Link a neighbor switch's invalid match and

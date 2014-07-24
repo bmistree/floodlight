@@ -1,6 +1,6 @@
 package com.bigswitch.floodlight.vendor;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 
 public class OFActionNiciraTtlDecrement extends OFActionNiciraVendor {
     public static int MINIMUM_LENGTH_TTL_DECREMENT = 16;
@@ -13,15 +13,16 @@ public class OFActionNiciraTtlDecrement extends OFActionNiciraVendor {
     }
     
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        data.skipBytes(6);  // pad
+        data.position(data.position() + 6);  // pad
     }
     
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeZero(6);
+        data.putShort((short)0); //pad
+        data.putInt((int)0); //pad
     }
 
     @Override

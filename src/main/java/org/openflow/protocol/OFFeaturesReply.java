@@ -1,40 +1,17 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-*
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.ByteBuffer;
+import java.util.EnumSet;
 
-
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.openflow.protocol.serializers.OFFeaturesReplyJSONSerializer;
-import org.openflow.protocol.serializers.StringDpidToLongJSONDeserializer;
 import org.openflow.util.U16;
-
+import org.openflow.util.U8;
 
 /**
  * Represents a features reply message
  * @author David Erickson (daviderickson@cs.stanford.edu)
+ * @author Srini Seetharaman (srini.seetharaman@gmail.com)
  *
  */
-@JsonSerialize(using=OFFeaturesReplyJSONSerializer.class)
 public class OFFeaturesReply extends OFMessage {
     public static int MINIMUM_LENGTH = 32;
 
@@ -45,16 +22,32 @@ public class OFFeaturesReply extends OFMessage {
         OFPC_FLOW_STATS     (1 << 0),
         OFPC_TABLE_STATS    (1 << 1),
         OFPC_PORT_STATS     (1 << 2),
-        OFPC_STP            (1 << 3),
-        OFPC_RESERVED       (1 << 4),
+        OFPC_GROUP_STATS    (1 << 3),
         OFPC_IP_REASM       (1 << 5),
         OFPC_QUEUE_STATS    (1 << 6),
-        OFPC_ARP_MATCH_IP   (1 << 7);
+        OFPC_PORT_BLOCKED   (1 << 8);
 
         protected int value;
-
+        
         private OFCapabilities(int value) {
             this.value = value;
+        }
+        
+        /**
+         * Given a capabilities value, return the list of OFCapabilities
+         * associated with it
+         *
+         * @param i capabilities value
+         * @return EnumSet<OFCapabilities>
+         */
+    
+        public static EnumSet<OFCapabilities> valueOf(int i) {
+            EnumSet<OFCapabilities> capabilities = EnumSet.noneOf(OFCapabilities.class);
+            for (OFCapabilities value: OFCapabilities.values()) {
+                if ((i & value.getValue()) != 0)
+                    capabilities.add(value);
+            }
+            return capabilities;
         }
 
         /**
@@ -68,9 +61,9 @@ public class OFFeaturesReply extends OFMessage {
     protected long datapathId;
     protected int buffers;
     protected byte tables;
+    protected byte auxiliaryId;
     protected int capabilities;
-    protected int actions;
-    protected List<OFPhysicalPort> ports;
+    protected int reserved;
 
     public OFFeaturesReply() {
         super();
@@ -88,9 +81,9 @@ public class OFFeaturesReply extends OFMessage {
     /**
      * @param datapathId the datapathId to set
      */
-    @JsonDeserialize(using=StringDpidToLongJSONDeserializer.class)
-    public void setDatapathId(long datapathId) {
+    public OFFeaturesReply setDatapathId(long datapathId) {
         this.datapathId = datapathId;
+        return this;
     }
 
     /**
@@ -103,8 +96,9 @@ public class OFFeaturesReply extends OFMessage {
     /**
      * @param buffers the buffers to set
      */
-    public void setBuffers(int buffers) {
+    public OFFeaturesReply setBuffers(int buffers) {
         this.buffers = buffers;
+        return this;
     }
 
     /**
@@ -117,8 +111,24 @@ public class OFFeaturesReply extends OFMessage {
     /**
      * @param tables the tables to set
      */
-    public void setTables(byte tables) {
+    public OFFeaturesReply setTables(byte tables) {
         this.tables = tables;
+        return this;
+    }
+
+    /**
+     * @return the auxiliaryId
+     */
+    public int getAuxiliaryId() {
+        return auxiliaryId;
+    }
+
+    /**
+     * @param capabilities the capabilities to set
+     */
+    public OFFeaturesReply setAuxiliaryId(byte auxiliaryId) {
+        this.auxiliaryId = auxiliaryId;
+        return this;
     }
 
     /**
@@ -131,94 +141,61 @@ public class OFFeaturesReply extends OFMessage {
     /**
      * @param capabilities the capabilities to set
      */
-    public void setCapabilities(int capabilities) {
+    public OFFeaturesReply setCapabilities(int capabilities) {
         this.capabilities = capabilities;
+        return this;
     }
 
     /**
-     * @return the actions
+     * @return the reserved
      */
     public int getActions() {
-        return actions;
+        return reserved;
     }
 
     /**
-     * @param actions the actions to set
+     * @param reserved the reserved to set
      */
-    public void setActions(int actions) {
-        this.actions = actions;
+    public OFFeaturesReply setActions(int reserved) {
+        this.reserved = reserved;
+        return this;
     }
 
-    /**
-     * @return the ports
-     */
-    public List<OFPhysicalPort> getPorts() {
-        return ports;
-    }
-
-    /**
-     * @param ports the ports to set
-     */
-    public void setPorts(List<OFPhysicalPort> ports) {
-        this.ports = ports;
-        if (ports == null) {
-            this.setLengthU(MINIMUM_LENGTH);
-        } else {
-            this.setLengthU(MINIMUM_LENGTH + ports.size()
-                    * OFPhysicalPort.MINIMUM_LENGTH);
-        }
-    }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        this.datapathId = data.readLong();
-        this.buffers = data.readInt();
-        this.tables = data.readByte();
-        data.readerIndex(data.readerIndex() + 3); // pad
-        this.capabilities = data.readInt();
-        this.actions = data.readInt();
-        if (this.ports == null) {
-            this.ports = new ArrayList<OFPhysicalPort>();
-        } else {
-            this.ports.clear();
-        }
-        int portCount = (super.getLengthU() - 32)
-                / OFPhysicalPort.MINIMUM_LENGTH;
-        OFPhysicalPort port;
-        for (int i = 0; i < portCount; ++i) {
-            port = new OFPhysicalPort();
-            port.readFrom(data);
-            this.ports.add(port);
-        }
+        this.datapathId = data.getLong();
+        this.buffers = data.getInt();
+        this.tables = data.get();
+        this.auxiliaryId = data.get();
+        data.position(data.position() + 2); // pad
+        this.capabilities = data.getInt();
+        this.reserved = data.getInt();
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeLong(this.datapathId);
-        data.writeInt(this.buffers);
-        data.writeByte(this.tables);
-        data.writeShort((short) 0); // pad
-        data.writeByte((byte) 0); // pad
-        data.writeInt(this.capabilities);
-        data.writeInt(this.actions);
-        if (this.ports != null)
-            for (OFPhysicalPort port : this.ports) {
-                port.writeTo(data);
-            }
+        data.putLong(this.datapathId);
+        data.putInt(this.buffers);
+        data.put(this.tables);
+        data.put(this.auxiliaryId);
+        data.putShort((short) 0); // pad
+        data.putInt(this.capabilities);
+        data.putInt(this.reserved);
     }
 
     @Override
     public int hashCode() {
         final int prime = 139;
         int result = super.hashCode();
-        result = prime * result + actions;
+        result = prime * result + reserved;
         result = prime * result + buffers;
         result = prime * result + capabilities;
         result = prime * result + (int) (datapathId ^ (datapathId >>> 32));
-        result = prime * result + ((ports == null) ? 0 : ports.hashCode());
         result = prime * result + tables;
+        result = prime * result + auxiliaryId;
         return result;
     }
 
@@ -234,7 +211,7 @@ public class OFFeaturesReply extends OFMessage {
             return false;
         }
         OFFeaturesReply other = (OFFeaturesReply) obj;
-        if (actions != other.actions) {
+        if (reserved != other.reserved) {
             return false;
         }
         if (buffers != other.buffers) {
@@ -246,16 +223,28 @@ public class OFFeaturesReply extends OFMessage {
         if (datapathId != other.datapathId) {
             return false;
         }
-        if (ports == null) {
-            if (other.ports != null) {
-                return false;
-            }
-        } else if (!ports.equals(other.ports)) {
-            return false;
-        }
         if (tables != other.tables) {
             return false;
         }
+        if (auxiliaryId != other.auxiliaryId) {
+            return false;
+        }
         return true;
+    }
+
+    /* (non-Javadoc)
+     * @see org.openflow.protocol.OFMessage#computeLength()
+     */
+    @Override
+    public void computeLength() {
+        this.length = U16.t(MINIMUM_LENGTH);
+    }
+    
+    @Override
+    public String toString() {
+        return "OFFeaturesReply [datapathId=" + Long.toHexString(datapathId) + 
+                ", buffers=" + buffers + ", tables=" + U8.f(tables) +
+                ", auxiliaryId=" + U8.f(auxiliaryId) + ", capabilities=" + 
+                OFCapabilities.valueOf(capabilities) + ", reserved=" + reserved + "]";
     }
 }

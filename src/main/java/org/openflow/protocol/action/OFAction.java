@@ -1,24 +1,7 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol.action;
 
+import java.nio.ByteBuffer;
 
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.util.U16;
 
 /**
@@ -83,8 +66,9 @@ public class OFAction implements Cloneable {
      *
      * @param type
      */
-    public void setType(OFActionType type) {
+    public OFAction setType(OFActionType type) {
         this.type = type;
+        return this;
     }
 
     /**
@@ -116,15 +100,15 @@ public class OFAction implements Cloneable {
         return action;
     }
 
-    public void readFrom(ChannelBuffer data) {
-        this.type = OFActionType.valueOf(data.readShort());
-        this.length = data.readShort();
+    public void readFrom(ByteBuffer data) {
+        this.type = OFActionType.valueOf(data.getShort());
+        this.length = data.getShort();
         // Note missing PAD, see MINIMUM_LENGTH comment for details
     }
 
-    public void writeTo(ChannelBuffer data) {
-        data.writeShort(type.getTypeValue());
-        data.writeShort(length);
+    public void writeTo(ByteBuffer data) {
+        data.putShort(type.getTypeValue());
+        data.putShort(length);
         // Note missing PAD, see MINIMUM_LENGTH comment for details
     }
 

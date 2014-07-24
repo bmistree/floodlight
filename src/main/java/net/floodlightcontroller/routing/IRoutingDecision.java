@@ -18,11 +18,13 @@
 package net.floodlightcontroller.routing;
 
 import java.util.List;
+import java.util.EnumSet;
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.FloodlightContextStore;
 import net.floodlightcontroller.devicemanager.IDevice;
 import net.floodlightcontroller.devicemanager.SwitchPort;
+import org.openflow.protocol.OFOXMFieldType;
 
 public interface IRoutingDecision {
     public enum RoutingAction {
@@ -57,8 +59,8 @@ public interface IRoutingDecision {
     public void addDestinationDevice(IDevice d);
     public List<SwitchPort> getMulticastInterfaces();
     public void setMulticastInterfaces(List<SwitchPort> lspt);
-    public Integer getWildcards();
-    public void setWildcards(Integer wildcards);
+    public EnumSet<OFOXMFieldType> getNonWildcards();
+    public void setNonWildcards(EnumSet<OFOXMFieldType> wildcards);
     public short getHardTimeout();
     public void setHardTimeout(short hardTimeout);
 }

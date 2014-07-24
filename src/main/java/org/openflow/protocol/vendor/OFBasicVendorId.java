@@ -20,7 +20,7 @@ package org.openflow.protocol.vendor;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 import org.openflow.protocol.Instantiable;
 
 /**
@@ -114,7 +114,7 @@ public class OFBasicVendorId extends OFVendorId {
      * @return the OFVendorDataType that can be used to instantiate the
      *         appropriate subclass of OFVendorData.
      */
-    public OFVendorDataType parseVendorDataType(ChannelBuffer data, int length) {
+    public OFVendorDataType parseVendorDataType(ByteBuffer data, int length) {
         OFVendorDataType vendorDataType = null;
         
         // Parse out the type code from the vendor data.
@@ -122,16 +122,16 @@ public class OFBasicVendorId extends OFVendorId {
         if ((length == 0) || (length >= dataTypeSize)) {
             switch (dataTypeSize) {
                 case 1:
-                    dataTypeValue = data.readByte();
+                    dataTypeValue = data.get();
                     break;
                 case 2:
-                    dataTypeValue = data.readShort();
+                    dataTypeValue = data.getShort();
                     break;
                 case 4:
-                    dataTypeValue = data.readInt();
+                    dataTypeValue = data.getInt();
                     break;
                 case 8:
-                    dataTypeValue = data.readLong();
+                    dataTypeValue = data.getLong();
                     break;
                 default:
                     // This would be indicative of a coding error where the

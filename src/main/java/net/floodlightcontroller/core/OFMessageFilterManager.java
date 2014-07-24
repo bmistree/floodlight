@@ -27,6 +27,10 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.openflow.protocol.OFFlowMod;
@@ -404,6 +408,107 @@ public class OFMessageFilterManager
         return MAX_FILTERS;
     }
 
+
+    public static String getMessageDataAsString(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
+        Ethernet eth;
+        StringBuffer sb =  new StringBuffer("");
+
+        DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
+        Date date = new Date();
+
+        sb.append(dateFormat.format(date));
+        sb.append("      ");
+
+        switch (msg.getType()) {
+            case PACKET_IN:
+                OFPacketIn pktIn = (OFPacketIn) msg;
+                sb.append("packet_in          [ ");
+                sb.append(sw.getStringId());
+                sb.append(" -> Controller");
+                sb.append(" ]");
+
+                sb.append("\ntotal length: ");
+                sb.append(pktIn.getTotalLength());
+                sb.append("\nin_port: ");
+                sb.append(pktIn.getInPort());
+                sb.append("\ndata_length: ");
+                sb.append(pktIn.getTotalLength() - OFPacketIn.MINIMUM_LENGTH);
+                sb.append("\nbuffer: ");
+                sb.append(pktIn.getBufferId());
+
+                // If the conext is not set by floodlight, then ignore.
+                if (cntx != null) {
+                // packet type  icmp, arp, etc.
+                    eth = IFloodlightProviderService.bcStore.get(cntx,
+                            IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
+                    if (eth != null)
+                           sb.append(eth.toString());
+                }
+                break;
+
+            case PACKET_OUT:
+                OFPacketOut pktOut = (OFPacketOut) msg;
+                sb.append("packet_out         [ ");
+                sb.append("Controller -> ");
+                sb.append(HexString.toHexString(sw.getId()));
+                sb.append(" ]");
+
+                sb.append("\nin_port: ");
+                sb.append(pktOut.getInPort());
+                sb.append("\nactions_len: ");
+                sb.append(pktOut.getActionsLength());
+                if (pktOut.getActions() != null) {
+                    sb.append("\nactions: ");
+                    sb.append(pktOut.getActions().toString());
+                }
+                break;
+
+            case FLOW_MOD:
+                OFFlowMod fm = (OFFlowMod) msg;
+                sb.append("flow_mod           [ ");
+                sb.append("Controller -> ");
+                sb.append(HexString.toHexString(sw.getId()));
+                sb.append(" ]");
+
+                // If the conext is not set by floodlight, then ignore.
+                if (cntx != null) {
+                    eth = IFloodlightProviderService.bcStore.get(cntx,
+                        IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
+                    if (eth != null)
+                        sb.append(eth.toString());
+                }
+
+                sb.append("\nADD: cookie: ");
+                sb.append(fm.getCookie());
+                sb.append(" idle: ");
+                sb.append(fm.getIdleTimeout());
+                sb.append(" hard: ");
+                sb.append(fm.getHardTimeout());
+                sb.append(" pri: ");
+                sb.append(fm.getPriority());
+                sb.append(" buf: ");
+                sb.append(fm.getBufferId());
+                sb.append(" flg: ");
+                sb.append(fm.getFlags());
+                if (fm.getInstructions() != null) {
+                    sb.append("\ninstructions: ");
+                    sb.append(fm.getInstructions().toString());
+                }
+                break;
+
+            default:
+                sb.append("[Unknown Packet]");
+        }
+
+        sb.append("\n\n");
+        return sb.toString();
+
+    }
+
+    public static byte[] getMessageData(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
+        return getMessageDataAsString(sw, msg, cntx).getBytes();
+    }
+
     protected void sendPacket(HashSet<String> matchedFilters, IOFSwitch sw, 
             OFMessage msg, FloodlightContext cntx, boolean sync) 
                     throws TException {
@@ -411,6 +516,7 @@ public class OFMessageFilterManager
         Packet packet = new Packet();
         ChannelBuffer bb;
         sendMsg.setPacket(packet);
+        msg.computeLength(); //Call computeLength to update length of the OF message
 
         List<String> sids = new ArrayList<String>(matchedFilters);
 
@@ -423,16 +529,16 @@ public class OFMessageFilterManager
                 packet.setSwPortTuple(new SwitchPortTuple(sw.getId(), 
                                                           pktIn.getInPort()));
                 bb = ChannelBuffers.buffer(pktIn.getLength());
-                pktIn.writeTo(bb);
-                packet.setData(OFMessage.getData(sw, msg, cntx));
+                pktIn.writeTo(bb.toByteBuffer());
+                packet.setData(getMessageData(sw, msg, cntx));
                 break;
             case PACKET_OUT:
                 OFPacketOut pktOut = (OFPacketOut)msg;
                 packet.setSwPortTuple(new SwitchPortTuple(sw.getId(), 
                                                           pktOut.getInPort()));
                 bb = ChannelBuffers.buffer(pktOut.getLength());
-                pktOut.writeTo(bb);
-                packet.setData(OFMessage.getData(sw, msg, cntx));
+                pktOut.writeTo(bb.toByteBuffer());
+                packet.setData(getMessageData(sw, msg, cntx));
                 break;
             case FLOW_MOD:
                 OFFlowMod offlowMod = (OFFlowMod)msg;
@@ -440,8 +546,8 @@ public class OFMessageFilterManager
                                                           offlowMod.
                                                           getOutPort()));
                 bb = ChannelBuffers.buffer(offlowMod.getLength());
-                offlowMod.writeTo(bb);
-                packet.setData(OFMessage.getData(sw, msg, cntx));
+                offlowMod.writeTo(bb.toByteBuffer());
+                packet.setData(getMessageData(sw, msg, cntx));
                 break;
             default:
                 packet.setSwPortTuple(new SwitchPortTuple(sw.getId(), 

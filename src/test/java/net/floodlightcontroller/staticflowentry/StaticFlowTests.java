@@ -17,13 +17,13 @@
 package net.floodlightcontroller.staticflowentry;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 
 import org.easymock.Capture;
 import org.easymock.CaptureType;
@@ -34,9 +34,10 @@ import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFPort;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
-import org.openflow.protocol.action.OFActionStripVirtualLan;
+import org.openflow.protocol.action.OFActionPopVLAN;
+import org.openflow.protocol.instruction.OFInstruction;
+import org.openflow.protocol.instruction.OFInstructionApplyActions;
 import org.openflow.util.HexString;
-
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IFloodlightProviderService;
@@ -69,18 +70,18 @@ public class StaticFlowTests extends FloodlightTestCase {
         TestRule1.put(COLUMN_NAME, "TestRule1");
         TestRule1.put(COLUMN_SWITCH, TestSwitch1DPID);
         // setup match
-        OFMatch match = new OFMatch();
+        OFMatch match = OFMatch.fromString("dl_dst=00:20:30:40:50:60");
         TestRule1.put(COLUMN_DL_DST, "00:20:30:40:50:60");
-        match.fromString("dl_dst=00:20:30:40:50:60");
+
         // setup actions
         List<OFAction> actions = new LinkedList<OFAction>();
         TestRule1.put(COLUMN_ACTIONS, "output=1");
         actions.add(new OFActionOutput((short)1, Short.MAX_VALUE));
         // done
         FlowMod1.setMatch(match);
-        FlowMod1.setActions(actions);
+        FlowMod1.setInstructions(Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actions)));
         FlowMod1.setBufferId(-1);
-        FlowMod1.setOutPort(OFPort.OFPP_NONE.getValue());
+        FlowMod1.setOutPort(OFPort.OFPP_ANY.getValue());
         FlowMod1.setPriority(Short.MAX_VALUE);
         FlowMod1.setLengthU(OFFlowMod.MINIMUM_LENGTH + 8);  // 8 bytes of actions
     }
@@ -94,18 +95,18 @@ public class StaticFlowTests extends FloodlightTestCase {
         TestRule2.put(COLUMN_NAME, "TestRule2");
         TestRule2.put(COLUMN_SWITCH, TestSwitch1DPID);
         // setup match
-        OFMatch match = new OFMatch();
+        OFMatch match = OFMatch.fromString("nw_dst=192.168.1.0/24");;
         TestRule2.put(COLUMN_NW_DST, "192.168.1.0/24");
-        match.fromString("nw_dst=192.168.1.0/24");
+
         // setup actions
         List<OFAction> actions = new LinkedList<OFAction>();
         TestRule2.put(COLUMN_ACTIONS, "output=1");
         actions.add(new OFActionOutput((short)1, Short.MAX_VALUE));
         // done
         FlowMod2.setMatch(match);
-        FlowMod2.setActions(actions);
+        FlowMod2.setInstructions(Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actions)));
         FlowMod2.setBufferId(-1);
-        FlowMod2.setOutPort(OFPort.OFPP_NONE.getValue());
+        FlowMod2.setOutPort(OFPort.OFPP_ANY.getValue());
         FlowMod2.setPriority(Short.MAX_VALUE);
         FlowMod2.setLengthU(OFFlowMod.MINIMUM_LENGTH + 8);  // 8 bytes of actions
 
@@ -127,19 +128,19 @@ public class StaticFlowTests extends FloodlightTestCase {
         TestRule3.put(COLUMN_NAME, "TestRule3");
         TestRule3.put(COLUMN_SWITCH, TestSwitch1DPID);
         // setup match
-        OFMatch match = new OFMatch();
+        OFMatch match = OFMatch.fromString("dl_dst=00:20:30:40:50:60,dl_vlan=4096");
         TestRule3.put(COLUMN_DL_DST, "00:20:30:40:50:60");
         TestRule3.put(COLUMN_DL_VLAN, 4096);
-        match.fromString("dl_dst=00:20:30:40:50:60,dl_vlan=4096");
+
         // setup actions
         TestRule3.put(COLUMN_ACTIONS, "output=controller");
         List<OFAction> actions = new LinkedList<OFAction>();
         actions.add(new OFActionOutput(OFPort.OFPP_CONTROLLER.getValue(), Short.MAX_VALUE));
         // done
         FlowMod3.setMatch(match);
-        FlowMod3.setActions(actions);
+        FlowMod3.setInstructions(Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actions)));
         FlowMod3.setBufferId(-1);
-        FlowMod3.setOutPort(OFPort.OFPP_NONE.getValue());
+        FlowMod3.setOutPort(OFPort.OFPP_ANY.getValue());
         FlowMod3.setPriority(Short.MAX_VALUE);
         FlowMod3.setLengthU(OFFlowMod.MINIMUM_LENGTH + 8);  // 8 bytes of actions
 
@@ -162,8 +163,8 @@ public class StaticFlowTests extends FloodlightTestCase {
 
 
     private void verifyActions(OFFlowMod testFlowMod, OFFlowMod goodFlowMod) {
-        List<OFAction> goodActions = goodFlowMod.getActions();
-        List<OFAction> testActions = testFlowMod.getActions();
+        List<OFAction> goodActions = ((OFInstructionApplyActions)(goodFlowMod.getInstructions().get(0))).getActions();
+        List<OFAction> testActions = ((OFInstructionApplyActions)(testFlowMod.getInstructions().get(0))).getActions();
         assertNotNull(goodActions);
         assertNotNull(testActions);
         assertEquals(goodActions.size(), testActions.size());
@@ -306,9 +307,10 @@ public class StaticFlowTests extends FloodlightTestCase {
         assertEquals(1, outList.size());
         OFFlowMod modifyFlowMod = (OFFlowMod) outList.get(0);
         FlowMod3.setCommand(OFFlowMod.OFPFC_MODIFY_STRICT);
-        List<OFAction> modifiedActions = FlowMod3.getActions();
-        modifiedActions.add(new OFActionStripVirtualLan()); // add the new action to what we should expect
-        FlowMod3.setActions(modifiedActions);
+        List<OFAction> modifiedActions = ((OFInstructionApplyActions)(FlowMod3.getInstructions().get(0))).getActions();
+        modifiedActions.add(new OFActionPopVLAN()); // add the new action to what we should expect
+        FlowMod3.setInstructions(Arrays.asList(
+        		(OFInstruction)new OFInstructionApplyActions().setActions(modifiedActions)));
         FlowMod3.setLengthU(OFFlowMod.MINIMUM_LENGTH + 16); // accommodate the addition of new actions
         verifyFlowMod(modifyFlowMod, FlowMod3);
 

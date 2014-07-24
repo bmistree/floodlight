@@ -32,7 +32,7 @@ public interface ILinkDiscoveryService extends IFloodlightService {
     /**
      * Returns if a given switchport is a tunnel endpoint or not
      */
-    public boolean isTunnelPort(long sw, short port);
+    public boolean isTunnelPort(long sw, int port);
 
     /**
      * Retrieves a map of all known link connections between OpenFlow switches
@@ -59,7 +59,7 @@ public interface ILinkDiscoveryService extends IFloodlightService {
      * to switchport (sw, port). PacketOut does not contain actions.
      * PacketOut length includes the minimum length and data length.
      */
-    public OFPacketOut generateLLDPMessage(long sw, short port,
+    public OFPacketOut generateLLDPMessage(long sw, int port,
                                            boolean isStandard,
                                            boolean isReverse);
 
@@ -84,17 +84,17 @@ public interface ILinkDiscoveryService extends IFloodlightService {
      * Adds a switch port to suppress lldp set. LLDPs and BDDPs will not be sent
      * out, and if any are received on this port then they will be dropped.
      */
-    public void AddToSuppressLLDPs(long sw, short port);
+    public void AddToSuppressLLDPs(long sw, int port);
 
     /**
      * Removes a switch port from suppress lldp set
      */
-    public void RemoveFromSuppressLLDPs(long sw, short port);
+    public void RemoveFromSuppressLLDPs(long sw, int port);
 
     /**
      * Get the set of quarantined ports on a switch
      */
-    public Set<Short> getQuarantinedPorts(long sw);
+    public Set<Integer> getQuarantinedPorts(long sw);
 
     /**
      * Get the status of auto port fast feature.

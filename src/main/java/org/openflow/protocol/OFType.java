@@ -1,23 +1,10 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
 import java.lang.reflect.Constructor;
+
+import org.openflow.util.U8;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * List of OpenFlow types and mappings to wire protocol value and derived
@@ -48,7 +35,7 @@ public enum OFType {
                             public OFMessage instantiate() {
                                 return new OFEchoReply();
                             }}),
-    VENDOR              (4, OFVendor.class, new Instantiable<OFMessage>() {
+    VENDOR        (4, OFVendor.class, new Instantiable<OFMessage>() {
                             @Override
                             public OFMessage instantiate() {
                                 return new OFVendor();
@@ -103,41 +90,85 @@ public enum OFType {
                             public OFMessage instantiate() {
                                 return new OFFlowMod();
                             }}),
-    PORT_MOD            (15, OFPortMod.class, new Instantiable<OFMessage>() {
+    GROUP_MOD           (15, OFGroupMod.class, new Instantiable<OFMessage>() {
+                            @Override
+                            public OFMessage instantiate() {
+                                return new OFGroupMod();
+                            }}),
+    PORT_MOD            (16, OFPortMod.class, new Instantiable<OFMessage>() {
                             @Override
                             public OFMessage instantiate() {
                                 return new OFPortMod();
                             }}),
-    STATS_REQUEST       (16, OFStatisticsRequest.class, new Instantiable<OFMessage>() {
+    TABLE_MOD           (17, OFTableMod.class, new Instantiable<OFMessage>() {
+                            @Override
+                            public OFMessage instantiate() {
+                                return new OFTableMod();
+                            }}),
+    STATS_REQUEST       (18, OFStatisticsRequest.class, new Instantiable<OFMessage>() {
                             @Override
                             public OFMessage instantiate() {
                                 return new OFStatisticsRequest();
                             }}),
-    STATS_REPLY         (17, OFStatisticsReply.class, new Instantiable<OFMessage>() {
+    STATS_REPLY         (19, OFStatisticsReply.class, new Instantiable<OFMessage>() {
                             @Override
                             public OFMessage instantiate() {
                                 return new OFStatisticsReply();
                             }}),
-    BARRIER_REQUEST     (18, OFBarrierRequest.class, new Instantiable<OFMessage>() {
+    BARRIER_REQUEST     (20, OFBarrierRequest.class, new Instantiable<OFMessage>() {
                             @Override
                             public OFMessage instantiate() {
                                 return new OFBarrierRequest();
                             }}),
-    BARRIER_REPLY       (19, OFBarrierReply.class, new Instantiable<OFMessage>() {
+    BARRIER_REPLY       (21, OFBarrierReply.class, new Instantiable<OFMessage>() {
                             @Override
                             public OFMessage instantiate() {
                                 return new OFBarrierReply();
                             }}),
-    QUEUE_GET_CONFIG_REQUEST    (20, OFQueueGetConfigRequest.class, new Instantiable<OFMessage>() {
-                                    @Override
-                                    public OFMessage instantiate() {
-                                        return new OFQueueGetConfigRequest();
-                                    }}),
-    QUEUE_GET_CONFIG_REPLY      (21, OFQueueGetConfigReply.class, new Instantiable<OFMessage>() {
-                                    @Override
-                                    public OFMessage instantiate() {
-                                        return new OFQueueGetConfigReply();
-                                    }});
+    QUEUE_GET_CONFIG_REQUEST (22, OFMessage.class, new Instantiable<OFMessage>() {
+                            @Override
+                            public OFMessage instantiate() {
+                                return new OFQueueGetConfigRequest();
+                            }}),
+    QUEUE_GET_CONFIG_REPLY  (23, OFMessage.class, new Instantiable<OFMessage>() {
+                            @Override
+                            public OFMessage instantiate() {
+                                return new OFQueueGetConfigReply();
+                            }}),
+    ROLE_REQUEST        (24, OFMessage.class, new Instantiable<OFMessage>() {
+                            @Override
+                            public OFMessage instantiate() {
+                                return new OFRoleMessage().setType(ROLE_REQUEST);
+                            }}),
+    ROLE_REPLY          (25, OFMessage.class, new Instantiable<OFMessage>() {
+                            @Override
+                            public OFMessage instantiate() {
+                                return new OFRoleMessage().setType(ROLE_REPLY);
+                            }}), 
+/* TODO
+    GET_ASYNC_REQUEST   (26, OFMessage.class, new Instantiable<OFMessage>() {
+                            @Override
+                            public OFMessage instantiate() {
+                                return new OFGetAsyncRequest();
+                            }}),
+    GET_ASYNC_REPLY     (27, OFMessage.class, new Instantiable<OFMessage>() {
+                            @Override
+                            public OFMessage instantiate() {
+                                return new OFGetAsyncReply();
+                            }}),
+    SET_ASYNC           (28, OFMessage.class, new Instantiable<OFMessage>() {
+                            @Override
+                            public OFMessage instantiate() {
+                                return new OFSetAsync();
+                            }}),
+ */
+    METER_MOD           (29, OFMessage.class, new Instantiable<OFMessage>() {
+                            @Override
+                            public OFMessage instantiate() {
+                                return new OFMeterMod();
+                            }});
+
+    protected static Logger log = LoggerFactory.getLogger(OFType.class);
 
     static OFType[] mapping;
 
@@ -146,12 +177,13 @@ public enum OFType {
     protected Instantiable<OFMessage> instantiable;
     protected byte type;
 
+
     /**
      * Store some information about the OpenFlow type, including wire protocol
      * type number, length, and derived class
      *
      * @param type Wire protocol number associated with this OFType
-     * @param clazz The Java class corresponding to this type of OpenFlow
+     * @param requestClass The Java class corresponding to this type of OpenFlow
      *              message
      * @param instantiator An Instantiator<OFMessage> implementation that creates an
      *          instance of the specified OFMessage
@@ -178,7 +210,8 @@ public enum OFType {
     static public void addMapping(byte i, OFType t) {
         if (mapping == null)
             mapping = new OFType[32];
-        OFType.mapping[i] = t;
+        if (i >= 0 && i < 32)
+            OFType.mapping[i] = t;
     }
 
     /**
@@ -187,7 +220,8 @@ public enum OFType {
      * @param i OpenFlow wire protocol type
      */
     static public void removeMapping(byte i) {
-        OFType.mapping[i] = null;
+        if (i >= 0 && i < 32)
+            OFType.mapping[i] = null;
     }
 
     /**
@@ -197,9 +231,12 @@ public enum OFType {
      * @param i wire protocol number
      * @return OFType enum type
      */
-
     static public OFType valueOf(Byte i) {
-        return OFType.mapping[i];
+        try {
+            return OFType.mapping[i];
+        } catch (ArrayIndexOutOfBoundsException e) {
+            throw new RuntimeException("Unknown message type requested: " + U8.f(i));
+        }
     }
 
     /**

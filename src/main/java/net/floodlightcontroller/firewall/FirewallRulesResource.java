@@ -71,12 +71,13 @@ public class FirewallRulesResource extends ServerResource {
         if (checkRuleExists(rule, firewall.getRules())) {
             status = "Error! A similar firewall rule already exists.";
             log.error(status);
+        	return ("{\"status\" : \"" + status + "\"}");
         } else {
             // add rule to firewall
             firewall.addRule(rule);
             status = "Rule added";
+        	return ("{\"status\" : \"" + status + "\", \"rule-id\" : \""+ Integer.toString(rule.ruleid) + "\"}");
         }
-        return ("{\"status\" : \"" + status + "\"}");
     }
 
     /**
@@ -208,7 +209,9 @@ public class FirewallRulesResource extends ServerResource {
                 if (tmp.equalsIgnoreCase("ANY") == false) {
                     rule.wildcard_nw_src = false;
                     rule.wildcard_dl_type = false;
-                    rule.dl_type = Ethernet.TYPE_IPv4;
+                    //If dl_type is unspecified, assume IPv4
+                    if (rule.dl_type==0)
+                    	rule.dl_type = Ethernet.TYPE_IPv4;
                     int[] cidr = IPCIDRToPrefixBits(tmp);
                     rule.nw_src_prefix = cidr[0];
                     rule.nw_src_maskbits = cidr[1];
@@ -220,7 +223,9 @@ public class FirewallRulesResource extends ServerResource {
                 if (tmp.equalsIgnoreCase("ANY") == false) {
                     rule.wildcard_nw_dst = false;
                     rule.wildcard_dl_type = false;
-                    rule.dl_type = Ethernet.TYPE_IPv4;
+                    //If dl_type is unspecified, assume IPv4
+                    if (rule.dl_type==0)
+                    	rule.dl_type = Ethernet.TYPE_IPv4;
                     int[] cidr = IPCIDRToPrefixBits(tmp);
                     rule.nw_dst_prefix = cidr[0];
                     rule.nw_dst_maskbits = cidr[1];

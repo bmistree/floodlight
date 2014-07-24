@@ -1,60 +1,50 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-*
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.protocol.factory.OFStatisticsFactory;
 import org.openflow.protocol.factory.OFStatisticsFactoryAware;
 import org.openflow.protocol.statistics.OFStatistics;
 import org.openflow.protocol.statistics.OFStatisticsType;
+import org.openflow.util.U16;
 
 
 /**
- * Base class for statistics requests/replies
+ * Base class for multipart messages (primarily statistics requests/replies)
  *
  * @author David Erickson (daviderickson@cs.stanford.edu) - Mar 27, 2010
  */
 public abstract class OFStatisticsMessageBase extends OFMessage implements
         OFStatisticsFactoryAware {
-    public static int MINIMUM_LENGTH = 12;
+    public static int MINIMUM_LENGTH = 16;
 
     protected OFStatisticsFactory statisticsFactory;
-    protected OFStatisticsType statisticType;
+    protected OFStatisticsType statisticsType;
     protected short flags;
-
-    // TODO: this should be List<? extends OFStatistics>, to
-    // allow for type safe assignments of lists of specific message
     protected List<? extends OFStatistics> statistics;
 
     /**
-     * @return the statisticType
+     * Construct a ofp_statistics_* message
      */
-    public OFStatisticsType getStatisticType() {
-        return statisticType;
+    public OFStatisticsMessageBase() {
+        super();
+        this.length = U16.t(MINIMUM_LENGTH);
     }
 
     /**
-     * @param statisticType the statisticType to set
+     * @return the statisticsType
      */
-    public void setStatisticType(OFStatisticsType statisticType) {
-        this.statisticType = statisticType;
+    public OFStatisticsType getStatisticsType() {
+        return statisticsType;
+    }
+
+    /**
+     * @param statisticsType the statisticsType to set
+     */
+    public OFStatisticsMessageBase setStatisticsType(OFStatisticsType statisticsType) {
+        this.statisticsType = statisticsType;
+        return this;
     }
 
     /**
@@ -67,34 +57,18 @@ public abstract class OFStatisticsMessageBase extends OFMessage implements
     /**
      * @param flags the flags to set
      */
-    public void setFlags(short flags) {
+    public OFStatisticsMessageBase setFlags(short flags) {
         this.flags = flags;
+        return this;
     }
 
-    /**
-     * @return the statistics
-     */
-    public List<? extends OFStatistics> getStatistics() {
-        return statistics;
-    }
-
-    /**
-     * return the first statistics request in the list of statistics, for
-     * statistics messages that expect exactly one message in their body (e.g.,
-     * flow stats request, port statsrequest)
-     *
-     * @return the first and only element in the list of statistics
-     * @throw IllegalArgumentException if the list does not contain exactly one
-     *        element
-     */
     public OFStatistics getFirstStatistics() {
         if (statistics == null ) {
-            throw new IllegalArgumentException("Invariant violation: statistics message of type "+statisticType+" is null");
+            throw new RuntimeException("No statistics statistics data available");
         }
-        if (statistics.size() != 1) {
-            throw new IllegalArgumentException("Invariant violation: statistics message of type "+statisticType+" contains "+statistics.size() +" statreq/reply messages in its body (should be 1)");
+        if (statistics.size() == 0) {
+            throw new RuntimeException("No statistics statistics data available");
         }
-
         return statistics.get(0);
     }
 
@@ -111,22 +85,24 @@ public abstract class OFStatisticsMessageBase extends OFMessage implements
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        this.statisticType = OFStatisticsType.valueOf(data.readShort(), this
+        this.statisticsType = OFStatisticsType.valueOf(data.getShort(), this
                 .getType());
-        this.flags = data.readShort();
+        this.flags = data.getShort();
+        data.getInt(); //pad
         if (this.statisticsFactory == null)
             throw new RuntimeException("OFStatisticsFactory not set");
         this.statistics = statisticsFactory.parseStatistics(this.getType(),
-                this.statisticType, data, super.getLengthU() - MINIMUM_LENGTH);
+                this.statisticsType, data, super.getLengthU() - MINIMUM_LENGTH);
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeShort(this.statisticType.getTypeValue());
-        data.writeShort(this.flags);
+        data.putShort(this.statisticsType.getTypeValue());
+        data.putShort(this.flags);
+        data.putInt(0); //pad
         if (this.statistics != null) {
             for (OFStatistics statistic : this.statistics) {
                 statistic.writeTo(data);
@@ -140,7 +116,7 @@ public abstract class OFStatisticsMessageBase extends OFMessage implements
         int result = super.hashCode();
         result = prime * result + flags;
         result = prime * result
-                + ((statisticType == null) ? 0 : statisticType.hashCode());
+                + ((statisticsType == null) ? 0 : statisticsType.hashCode());
         result = prime * result
                 + ((statistics == null) ? 0 : statistics.hashCode());
         return result;
@@ -161,11 +137,11 @@ public abstract class OFStatisticsMessageBase extends OFMessage implements
         if (flags != other.flags) {
             return false;
         }
-        if (statisticType == null) {
-            if (other.statisticType != null) {
+        if (statisticsType == null) {
+            if (other.statisticsType != null) {
                 return false;
             }
-        } else if (!statisticType.equals(other.statisticType)) {
+        } else if (!statisticsType.equals(other.statisticsType)) {
             return false;
         }
         if (statistics == null) {
@@ -176,5 +152,25 @@ public abstract class OFStatisticsMessageBase extends OFMessage implements
             return false;
         }
         return true;
+    }
+
+    @Override
+    public String toString() {
+        return "OFStatisticsMessage [type=" + statisticsType + ", flags=" + flags + 
+                ", data=" + statistics + "]";
+    }
+
+    /* (non-Javadoc)
+     * @see org.openflow.protocol.OFMessage#computeLength()
+     */
+    @Override
+    public void computeLength() {
+        int l = MINIMUM_LENGTH;
+        if (statistics != null) {
+            for (OFStatistics stat : statistics) {
+                l += stat.computeLength();
+            }
+        }
+        this.length = U16.t(l);
     }
 }

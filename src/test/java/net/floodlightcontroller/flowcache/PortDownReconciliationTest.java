@@ -23,6 +23,7 @@ import static org.easymock.EasyMock.replay;
 import static org.easymock.EasyMock.verify;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -44,6 +45,8 @@ import org.openflow.protocol.OFStatisticsRequest;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
+import org.openflow.protocol.instruction.OFInstruction;
+import org.openflow.protocol.instruction.OFInstructionApplyActions;
 import org.openflow.protocol.statistics.OFFlowStatisticsReply;
 import org.openflow.protocol.statistics.OFFlowStatisticsRequest;
 import org.openflow.protocol.statistics.OFStatistics;
@@ -139,11 +142,11 @@ public class PortDownReconciliationTest extends FloodlightTestCase {
 
         // The STATS_REQUEST object used when querying the switches for flows
         OFStatisticsRequest req = new OFStatisticsRequest();
-        req.setStatisticType(OFStatisticsType.FLOW);
+        req.setStatisticsType(OFStatisticsType.FLOW);
         int requestLength = req.getLengthU();
         OFFlowStatisticsRequest specificReq = new OFFlowStatisticsRequest();
-        specificReq.setMatch(new OFMatch().setWildcards(0xffffffff));
-        specificReq.setOutPort((short) 3);
+        specificReq.setMatch(new OFMatch());
+        specificReq.setOutPort(3);
         specificReq.setTableId((byte) 0xff);
         req.setStatistics(Collections.singletonList((OFStatistics) specificReq));
         requestLength += specificReq.getLength();
@@ -157,11 +160,11 @@ public class PortDownReconciliationTest extends FloodlightTestCase {
         // Match for the STATS_REPLY object
         OFMatch m = new OFMatch();
         // Set the incoming port to 1 so that it will find the connected
-        m.setInputPort((short) 1);
+        m.setInPort((short) 1);
 
         // STATS_REPLY object
         OFFlowStatisticsReply reply = new OFFlowStatisticsReply();
-        reply.setActions(actions);
+        reply.setInstructions(Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actions)));
         reply.setMatch(m);
         // Add the reply to the list of OFStatistics
         statsReply.add(reply);
@@ -231,7 +234,7 @@ public class PortDownReconciliationTest extends FloodlightTestCase {
         // Create the only OFMatch Reconcile object that will be in the list
         ofmr = new OFMatchReconcile();
         long affectedSwitch = sw1.getId();
-        OFMatchWithSwDpid ofmatchsw = new OFMatchWithSwDpid(new OFMatch().setWildcards(OFMatch.OFPFW_ALL),
+        OFMatchWithSwDpid ofmatchsw = new OFMatchWithSwDpid(new OFMatch(),
                                                             affectedSwitch);
         ofmr.rcAction = OFMatchReconcile.ReconcileAction.UPDATE_PATH;
         ofmr.ofmWithSwDpid = ofmatchsw;
@@ -245,14 +248,14 @@ public class PortDownReconciliationTest extends FloodlightTestCase {
         // Expected Flow Mod Deletes Messages
         // Flow Mod Delete for base switch
         fm = ((OFFlowMod) mockFloodlightProvider.getOFMessageFactory()
-                                                 .getMessage(OFType.FLOW_MOD)).setMatch(new OFMatch().setWildcards(OFMatch.OFPFW_ALL))
+                                                 .getMessage(OFType.FLOW_MOD)).setMatch(new OFMatch())
                                                                               .setCommand(OFFlowMod.OFPFC_DELETE)
                                                                               // Notice
                                                                               // we
                                                                               // specify
                                                                               // an
                                                                               // outPort
-                                                                              .setOutPort((short) 3)
+                                                                              .setOutPort(3)
                                                                               .setLength(U16.t(OFFlowMod.MINIMUM_LENGTH));
 
         // Flow Mod Delete for the neighborswitches
@@ -266,7 +269,7 @@ public class PortDownReconciliationTest extends FloodlightTestCase {
                                                                                // specific
                                                                                // an
                                                                                // outPort
-                                                                               .setOutPort((short) 3)
+                                                                               .setOutPort(3)
                                                                                .setLength(U16.t(OFFlowMod.MINIMUM_LENGTH));
 
     }

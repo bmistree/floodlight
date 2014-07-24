@@ -1,6 +1,6 @@
 package com.bigswitch.floodlight.vendor;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 import org.openflow.protocol.Instantiable;
 import org.openflow.protocol.vendor.OFVendorData;
 
@@ -101,25 +101,25 @@ public class OFBsnPktinSuppressionSetRequestVendorData
     }
 
     @Override
-    public void readFrom(ChannelBuffer data, int length) {
+    public void readFrom(ByteBuffer data, int length) {
         super.readFrom(data, length);
-        suppressionEnabled = (data.readByte() != 0);
-        data.readByte();
-        idleTimeout = data.readShort();
-        hardTimeout = data.readShort();
-        priority = data.readShort();
-        cookie = data.readLong();
+        suppressionEnabled = (data.get() != 0);
+        data.get();
+        idleTimeout = data.getShort();
+        hardTimeout = data.getShort();
+        priority = data.getShort();
+        cookie = data.getLong();
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeByte(suppressionEnabled ? 1 : 0);
-        data.writeByte(0); // pad
-        data.writeShort(idleTimeout);
-        data.writeShort(hardTimeout);
-        data.writeShort(priority);
-        data.writeLong(cookie);
+        data.put((byte)(suppressionEnabled ? 1 : 0));
+        data.put((byte)0); // pad
+        data.putShort(idleTimeout);
+        data.putShort(hardTimeout);
+        data.putShort(priority);
+        data.putLong(cookie);
     }
 
     @Override

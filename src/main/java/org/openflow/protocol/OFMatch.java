@@ -1,138 +1,138 @@
-/**
- *    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
- *    University
- *
- *    Licensed under the Apache License, Version 2.0 (the "License"); you may
- *    not use this file except in compliance with the License. You may obtain
- *    a copy of the License at
- *
- *         http://www.apache.org/licenses/LICENSE-2.0
- *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- *    License for the specific language governing permissions and limitations
- *    under the License.
- **/
-
 package org.openflow.protocol;
 
-import java.io.Serializable;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
+import java.util.List;
+import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.Set;
 
-import net.floodlightcontroller.packet.Ethernet;
-
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.openflow.protocol.serializers.OFMatchJSONSerializer;
 import org.openflow.util.HexString;
-import org.openflow.util.U16;
 import org.openflow.util.U8;
+import org.openflow.util.U16;
+import org.openflow.util.U32;
 
 /**
  * Represents an ofp_match structure
- *
- * @author David Erickson (daviderickson@cs.stanford.edu)
- * @author Rob Sherwood (rob.sherwood@stanford.edu)
+ * 
+ * @author Srini Seetharaman (srini.seetharaman@gmail.com)
+ * 
  */
-@JsonSerialize(using = OFMatchJSONSerializer.class)
-public class OFMatch implements Cloneable, Serializable {
+
+public class OFMatch implements Cloneable {
+    /**
+     * 
+     */
+    public static int MINIMUM_LENGTH = 8;
+
+    public static final short ETH_TYPE_IPV4 = (short)0x800;
+    public static final short ETH_TYPE_IPV6 = (short)0x86dd;
+    public static final short ETH_TYPE_ARP = (short)0x806;
+    public static final short ETH_TYPE_VLAN = (short)0x8100;
+    public static final short ETH_TYPE_LLDP = (short)0x88cc;
+    public static final short ETH_TYPE_MPLS_UNICAST = (short)0x8847;    
+    public static final short ETH_TYPE_MPLS_MULTICAST = (short)0x8848;    
+
+    public static final byte IP_PROTO_ICMP = 0x1;
+    public static final byte IP_PROTO_TCP = 0x6;
+    public static final byte IP_PROTO_UDP = 0x11;
+    public static final byte IP_PROTO_SCTP = (byte)0x84;
+    
+    enum OFMatchType {
+        STANDARD, OXM
+    }
+        
+    // Note: Only supporting OXM and OpenFlow_Basic matches
+    public enum OFMatchClass {
+        NXM_0                ((short)0x0000),
+        NXM_1                ((short)0x0001),
+        OPENFLOW_BASIC       ((short)0x8000),
+        VENDOR               ((short)0xffff);
+
+        protected short value;
+
+        private OFMatchClass(short value) {
+            this.value = value;
+        }
+
+        /**
+         * @return the value
+         */
+        public short getValue() {
+            return value;
+        }
+    }
+
+    protected OFMatchType type;
+    protected short length; //total length including padding
+    protected short matchLength; // length excluding padding
+    protected List<OFMatchField> matchFields;
 
     /**
-     *
-     */
-    private static final long serialVersionUID = 1L;
-    public static int MINIMUM_LENGTH = 40;
-    final public static int OFPFW_ALL = ((1 << 22) - 1);
-
-    final public static int OFPFW_IN_PORT = 1 << 0; /* Switch input port. */
-    final public static int OFPFW_DL_VLAN = 1 << 1; /* VLAN id. */
-    final public static int OFPFW_DL_SRC = 1 << 2; /* Ethernet source address. */
-    final public static int OFPFW_DL_DST = 1 << 3; /*
-                                                    * Ethernet destination
-                                                    * address.
-                                                    */
-    final public static int OFPFW_DL_TYPE = 1 << 4; /* Ethernet frame type. */
-    final public static int OFPFW_NW_PROTO = 1 << 5; /* IP protocol. */
-    final public static int OFPFW_TP_SRC = 1 << 6; /* TCP/UDP source port. */
-    final public static int OFPFW_TP_DST = 1 << 7; /* TCP/UDP destination port. */
-
-    /*
-     * IP source address wildcard bit count. 0 is exact match, 1 ignores the
-     * LSB, 2 ignores the 2 least-significant bits, ..., 32 and higher wildcard
-     * the entire field. This is the *opposite* of the usual convention where
-     * e.g. /24 indicates that 8 bits (not 24 bits) are wildcarded.
-     */
-    final public static int OFPFW_NW_SRC_SHIFT = 8;
-    final public static int OFPFW_NW_SRC_BITS = 6;
-    final public static int OFPFW_NW_SRC_MASK = ((1 << OFPFW_NW_SRC_BITS) - 1) << OFPFW_NW_SRC_SHIFT;
-    final public static int OFPFW_NW_SRC_ALL = 32 << OFPFW_NW_SRC_SHIFT;
-
-    /* IP destination address wildcard bit count. Same format as source. */
-    final public static int OFPFW_NW_DST_SHIFT = 14;
-    final public static int OFPFW_NW_DST_BITS = 6;
-    final public static int OFPFW_NW_DST_MASK = ((1 << OFPFW_NW_DST_BITS) - 1) << OFPFW_NW_DST_SHIFT;
-    final public static int OFPFW_NW_DST_ALL = 32 << OFPFW_NW_DST_SHIFT;
-
-    final public static int OFPFW_DL_VLAN_PCP = 1 << 20; /* VLAN priority. */
-    final public static int OFPFW_NW_TOS = 1 << 21; /*
-                                                     * IP ToS (DSCP field, 6
-                                                     * bits).
-                                                     */
-
-    final public static int OFPFW_ALL_SANITIZED = (((1 << 22) - 1)
-                                                   & ~OFPFW_NW_SRC_MASK & ~OFPFW_NW_DST_MASK)
-                                                  | OFPFW_NW_SRC_ALL
-                                                  | OFPFW_NW_DST_ALL;
-
-    /* List of Strings for marshalling and unmarshalling to human readable forms */
-    final public static String STR_IN_PORT = "in_port";
-    final public static String STR_DL_DST = "dl_dst";
-    final public static String STR_DL_SRC = "dl_src";
-    final public static String STR_DL_TYPE = "dl_type";
-    final public static String STR_DL_VLAN = "dl_vlan";
-    final public static String STR_DL_VLAN_PCP = "dl_vlan_pcp";
-    final public static String STR_NW_DST = "nw_dst";
-    final public static String STR_NW_SRC = "nw_src";
-    final public static String STR_NW_PROTO = "nw_proto";
-    final public static String STR_NW_TOS = "nw_tos";
-    final public static String STR_TP_DST = "tp_dst";
-    final public static String STR_TP_SRC = "tp_src";
-
-    protected int wildcards;
-    protected short inputPort;
-    protected byte[] dataLayerSource;
-    protected byte[] dataLayerDestination;
-    protected short dataLayerVirtualLan;
-    protected byte dataLayerVirtualLanPriorityCodePoint;
-    protected short dataLayerType;
-    protected byte networkTypeOfService;
-    protected byte networkProtocol;
-    protected int networkSource;
-    protected int networkDestination;
-    protected short transportSource;
-    protected short transportDestination;
-
-    /**
-     * By default, create a OFMatch that matches everything (mostly because it's
-     * the least amount of work to make a valid OFMatch)
+     * By default, create a OFMatch that matches everything
+     * (mostly because it's the least amount of work to make a valid OFMatch)
      */
     public OFMatch() {
-        this.wildcards = OFPFW_ALL;
-        this.dataLayerDestination = new byte[] { 0x0, 0x0, 0x0, 0x0, 0x0,
-                                                0x0 };
-        this.dataLayerSource = new byte[] { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 };
-        this.dataLayerVirtualLan = Ethernet.VLAN_UNTAGGED;
-        this.dataLayerVirtualLanPriorityCodePoint = 0;
-        this.dataLayerType = 0;
-        this.inputPort = 0;
-        this.networkProtocol = 0;
-        this.networkTypeOfService = 0;
-        this.networkSource = 0;
-        this.networkDestination = 0;
-        this.transportDestination = 0;
-        this.transportSource = 0;
+        this.type = OFMatchType.OXM;
+        this.length = U16.t(MINIMUM_LENGTH);
+        this.matchLength = 4; //No padding
+        this.matchFields = new ArrayList<OFMatchField>();
+    }
+
+    /**
+     * Get value of particular field
+     * @return
+     */
+    public Object getMatchFieldValue(OFOXMFieldType matchType) {
+        for (OFMatchField matchField: matchFields) {
+            if (matchField.getType() == matchType)
+                return matchField.getValue();
+        }
+        throw new IllegalArgumentException("No match exists for matchfield " + matchType.getName());
+    }
+
+    /**
+     * Get mask of particular field
+     * @return
+     */
+    public Object getMatchFieldMask(OFOXMFieldType matchType) {
+        for (OFMatchField matchField: matchFields) {
+            if (matchField.getType() == matchType)
+                return matchField.getMask();
+        }
+        throw new IllegalArgumentException("No match exists for matchfield " + matchType.getName());
+    }
+
+    /**
+     * Check if a particular match field exists
+     * @return boolean indicating if the field value exists 
+     */
+    public boolean fieldExists(OFOXMFieldType matchType) {
+        for (OFMatchField matchField: matchFields) {
+            if (matchField.getType() == matchType)
+                return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get in_port
+     * @return integer
+     */
+    public int getInPort() {
+        try {
+    	    return (Integer)getMatchFieldValue(OFOXMFieldType.IN_PORT);
+        } catch (IllegalArgumentException e) {
+            return OFPort.OFPP_ANY.getValue();
+        }
+    }
+
+    /**
+     * Set in_port in match
+     * @param in_port
+     */
+    public OFMatch setInPort(int inPort) {
+    	this.setField(OFOXMFieldType.IN_PORT, inPort);
+    	return this;
     }
 
     /**
@@ -141,7 +141,11 @@ public class OFMatch implements Cloneable, Serializable {
      * @return an arrays of bytes
      */
     public byte[] getDataLayerDestination() {
-        return this.dataLayerDestination;
+        try {
+            return (byte[])getMatchFieldValue(OFOXMFieldType.ETH_DST);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /**
@@ -150,7 +154,7 @@ public class OFMatch implements Cloneable, Serializable {
      * @param dataLayerDestination
      */
     public OFMatch setDataLayerDestination(byte[] dataLayerDestination) {
-        this.dataLayerDestination = dataLayerDestination;
+    	this.setField(OFOXMFieldType.ETH_DST, dataLayerDestination);
         return this;
     }
 
@@ -163,12 +167,9 @@ public class OFMatch implements Cloneable, Serializable {
      */
     public OFMatch setDataLayerDestination(String mac) {
         byte bytes[] = HexString.fromHexString(mac);
-        if (bytes.length != 6)
-                              throw new IllegalArgumentException(
-                                                                 "expected string with 6 octets, got '"
-                                                                         + mac
-                                                                         + "'");
-        this.dataLayerDestination = bytes;
+        if (bytes.length != OFPhysicalPort.OFP_ETH_ALEN)
+        	throw new IllegalArgumentException("expected string with 6 octets, got '" + mac + "'");
+        this.setField(OFOXMFieldType.ETH_DST, bytes);
         return this;
     }
 
@@ -178,7 +179,11 @@ public class OFMatch implements Cloneable, Serializable {
      * @return an array of bytes
      */
     public byte[] getDataLayerSource() {
-        return this.dataLayerSource;
+        try {
+            return (byte[])getMatchFieldValue(OFOXMFieldType.ETH_SRC);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /**
@@ -187,7 +192,7 @@ public class OFMatch implements Cloneable, Serializable {
      * @param dataLayerSource
      */
     public OFMatch setDataLayerSource(byte[] dataLayerSource) {
-        this.dataLayerSource = dataLayerSource;
+    	this.setField(OFOXMFieldType.ETH_SRC, dataLayerSource);
         return this;
     }
 
@@ -200,12 +205,9 @@ public class OFMatch implements Cloneable, Serializable {
      */
     public OFMatch setDataLayerSource(String mac) {
         byte bytes[] = HexString.fromHexString(mac);
-        if (bytes.length != 6)
-                              throw new IllegalArgumentException(
-                                                                 "expected string with 6 octets, got '"
-                                                                         + mac
-                                                                         + "'");
-        this.dataLayerSource = bytes;
+        if (bytes.length != OFPhysicalPort.OFP_ETH_ALEN)
+        	throw new IllegalArgumentException("expected string with 6 octets, got '" + mac + "'");
+        this.setField(OFOXMFieldType.ETH_SRC, bytes);
         return this;
     }
 
@@ -215,7 +217,7 @@ public class OFMatch implements Cloneable, Serializable {
      * @return ether_type
      */
     public short getDataLayerType() {
-        return this.dataLayerType;
+        return (Short)getMatchFieldValue(OFOXMFieldType.ETH_TYPE);
     }
 
     /**
@@ -224,36 +226,44 @@ public class OFMatch implements Cloneable, Serializable {
      * @param dataLayerType
      */
     public OFMatch setDataLayerType(short dataLayerType) {
-        this.dataLayerType = dataLayerType;
+    	this.setField(OFOXMFieldType.ETH_TYPE, dataLayerType);
         return this;
     }
 
     /**
      * Get dl_vlan
      *
-     * @return vlan tag; VLAN_NONE == no tag
+     * @return vlan tag without the VLAN present bit set
      */
     public short getDataLayerVirtualLan() {
-        return this.dataLayerVirtualLan;
+        try {
+            return (short)((Short)getMatchFieldValue(OFOXMFieldType.VLAN_VID) & 0xFFF);
+        } catch (IllegalArgumentException e) {
+            return OFVlanId.OFPVID_NONE.getValue();
+        }
     }
 
     /**
      * Set dl_vlan
      *
-     * @param dataLayerVirtualLan
+     * @param dataLayerVirtualLan VLAN ID without the VLAN present bit set
      */
-    public OFMatch setDataLayerVirtualLan(short dataLayerVirtualLan) {
-        this.dataLayerVirtualLan = dataLayerVirtualLan;
+    public OFMatch setDataLayerVirtualLan(short vlan) {
+    	this.setField(OFOXMFieldType.VLAN_VID, vlan | OFVlanId.OFPVID_PRESENT.getValue());
         return this;
     }
 
     /**
      * Get dl_vlan_pcp
      *
-     * @return
+     * @return VLAN PCP value
      */
     public byte getDataLayerVirtualLanPriorityCodePoint() {
-        return this.dataLayerVirtualLanPriorityCodePoint;
+        try {
+            return (Byte) getMatchFieldValue(OFOXMFieldType.VLAN_PCP);
+        } catch (IllegalArgumentException e) {
+            return 0;
+        }
     }
 
     /**
@@ -262,73 +272,8 @@ public class OFMatch implements Cloneable, Serializable {
      * @param pcp
      */
     public OFMatch setDataLayerVirtualLanPriorityCodePoint(byte pcp) {
-        this.dataLayerVirtualLanPriorityCodePoint = pcp;
+    	this.setField(OFOXMFieldType.VLAN_VID, pcp);
         return this;
-    }
-
-    /**
-     * Get in_port
-     *
-     * @return
-     */
-    public short getInputPort() {
-        return this.inputPort;
-    }
-
-    /**
-     * Set in_port
-     *
-     * @param inputPort
-     */
-    public OFMatch setInputPort(short inputPort) {
-        this.inputPort = inputPort;
-        return this;
-    }
-
-    /**
-     * Get nw_dst
-     *
-     * @return
-     */
-    public int getNetworkDestination() {
-        return this.networkDestination;
-    }
-
-    /**
-     * Set nw_dst
-     *
-     * @param networkDestination
-     */
-    public OFMatch setNetworkDestination(int networkDestination) {
-        this.networkDestination = networkDestination;
-        return this;
-    }
-
-    /**
-     * Parse this match's wildcard fields and return the number of significant
-     * bits in the IP destination field. NOTE: this returns the number of bits
-     * that are fixed, i.e., like CIDR, not the number of bits that are free
-     * like OpenFlow encodes.
-     *
-     * @return a number between 0 (matches all IPs) and 63 ( 32>= implies exact
-     *         match)
-     */
-    public int getNetworkDestinationMaskLen() {
-        return Math.max(32 - ((wildcards & OFPFW_NW_DST_MASK) >> OFPFW_NW_DST_SHIFT),
-                        0);
-    }
-
-    /**
-     * Parse this match's wildcard fields and return the number of significant
-     * bits in the IP destination field. NOTE: this returns the number of bits
-     * that are fixed, i.e., like CIDR, not the number of bits that are free
-     * like OpenFlow encodes.
-     *
-     * @return a number between 0 (matches all IPs) and 32 (exact match)
-     */
-    public int getNetworkSourceMaskLen() {
-        return Math.max(32 - ((wildcards & OFPFW_NW_SRC_MASK) >> OFPFW_NW_SRC_SHIFT),
-                        0);
     }
 
     /**
@@ -337,7 +282,7 @@ public class OFMatch implements Cloneable, Serializable {
      * @return
      */
     public byte getNetworkProtocol() {
-        return this.networkProtocol;
+        return (Byte)getMatchFieldValue(OFOXMFieldType.IP_PROTO);
     }
 
     /**
@@ -346,321 +291,515 @@ public class OFMatch implements Cloneable, Serializable {
      * @param networkProtocol
      */
     public OFMatch setNetworkProtocol(byte networkProtocol) {
-        this.networkProtocol = networkProtocol;
+        this.setField(OFOXMFieldType.IP_PROTO, networkProtocol);
+        return this;
+    }
+
+    /**
+     * Get nw_tos OFMatch stores the ToS bits as 6-bits in the lower significant bits
+     *
+     * @return : 6-bit DSCP value (0-63) in higher bits and 2-bit ECN in lower bits
+     */
+    public byte getNetworkTypeOfService() {
+        try {
+            byte dscp = (byte)((((Byte)getMatchFieldValue(OFOXMFieldType.IP_DSCP)) & 0x3f) << 2);
+            byte ecn = (byte)(((Byte)getMatchFieldValue(OFOXMFieldType.IP_ECN)) & 0x3);
+            return (byte)(dscp & ecn);
+        } catch (IllegalArgumentException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Set nw_tos OFMatch stores the DSCP and ECN separately
+     *
+     * @param networkTypeOfService TOS value with 6-bit DSCP value (0-63) 
+     * in higher significant bits and ECN in the lower 2 bits
+     */
+    public OFMatch setNetworkTypeOfService(byte networkTypeOfService) {
+        this.setField(OFOXMFieldType.IP_DSCP, (byte)((networkTypeOfService >> 2) & 0x3f));
+        this.setField(OFOXMFieldType.IP_ECN, (byte)(networkTypeOfService & 0x3));
+        return this;
+    }
+
+    /**
+     * Get nw_dst
+     *
+     * @return integer destination IP address
+     */
+    public int getNetworkDestination() {
+        try {
+            return (Integer)getMatchFieldValue(OFOXMFieldType.IPV4_DST);
+        } catch (IllegalArgumentException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Get nw_dst mask
+     *
+     * @return integer destination IP address mask
+     */
+    public int getNetworkDestinationMask() {
+        Object mask = getMatchFieldMask(OFOXMFieldType.IPV4_DST);
+        if (mask == null)
+        	return 0;
+        else
+        	return (Integer)mask;
+    }
+
+    /**
+     * Set nw_dst
+     *
+     * @param networkDestination destination IP address
+     */
+    public OFMatch setNetworkDestination(int networkDestination) {
+        setNetworkDestination(ETH_TYPE_IPV4, networkDestination);
+        return this;
+    }
+
+    /**
+     * Set nw_dst
+     *
+     * @param dataLayerType ether type
+     * @param networkDestination destination IP address
+     */
+    public OFMatch setNetworkDestination(short dataLayerType, int networkDestination) {
+    	switch (dataLayerType) {    		
+		    case ETH_TYPE_IPV4:
+		        this.setField(OFOXMFieldType.IPV4_DST, networkDestination);
+		        break;
+		    case ETH_TYPE_IPV6:
+		        this.setField(OFOXMFieldType.IPV6_DST, networkDestination);
+		        break;
+		    case ETH_TYPE_ARP:
+		        this.setField(OFOXMFieldType.ARP_THA, networkDestination);
+		        break;
+    	}
+        return this;
+    }
+
+    /**
+     * Set nw_dst and nw_dst_mask
+     *
+     * @param networkDestination destination IP address 
+     * @param networkMask network mask
+     */
+    public OFMatch setNetworkDestinationMask(int networkDestination, int networkMask) {
+        this.setField(OFOXMFieldType.IPV4_DST, networkDestination, networkMask);
         return this;
     }
 
     /**
      * Get nw_src
      *
-     * @return
+     * @return integer source IP address
      */
+    // TODO: Add support for IPv6
     public int getNetworkSource() {
-        return this.networkSource;
+        try {
+            return (Integer)getMatchFieldValue(OFOXMFieldType.IPV4_SRC);
+        } catch (IllegalArgumentException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Get nw_src mask
+     *
+     * @return integer source IP address mask
+     */
+    public int getNetworkSourceMask() {
+        Object mask = getMatchFieldMask(OFOXMFieldType.IPV4_SRC);
+        if (mask == null)
+        	return 0;
+        else
+        	return (Integer)mask;
     }
 
     /**
      * Set nw_src
      *
-     * @param networkSource
+     * @param networkSource source IP address
      */
+    // TODO: Add support for IPv6
     public OFMatch setNetworkSource(int networkSource) {
-        this.networkSource = networkSource;
+        setNetworkSource(ETH_TYPE_IPV4, networkSource);
         return this;
     }
 
     /**
-     * Get nw_tos OFMatch stores the ToS bits as top 6-bits, so right shift by 2
-     * bits before returning the value
+     * Set nw_src
      *
-     * @return : 6-bit DSCP value (0-63)
+     * @param dataLayerType ether type
+     * @param networkSource source IP address
      */
-    public byte getNetworkTypeOfService() {
-        return (byte) ((this.networkTypeOfService >> 2) & 0x3f);
+    // TODO: Add support for IPv6
+    public OFMatch setNetworkSource(short dataLayerType, int networkSource) {
+    	switch (dataLayerType) {    		
+		    case ETH_TYPE_IPV4:
+		        this.setField(OFOXMFieldType.IPV4_SRC, networkSource);
+		        break;
+		    case ETH_TYPE_ARP:
+		        this.setField(OFOXMFieldType.ARP_SHA, networkSource);
+		        break;
+    	}
+        return this;
     }
 
     /**
-     * Set nw_tos OFMatch stores the ToS bits as top 6-bits, so left shift by 2
-     * bits before storing the value
+     * Set nw_src and nw_src_mask
      *
-     * @param networkTypeOfService
-     *            : 6-bit DSCP value (0-63)
+     * @param networkSource source IP address 
+     * @param networkMask network mask
      */
-    public OFMatch setNetworkTypeOfService(byte networkTypeOfService) {
-        this.networkTypeOfService = (byte) (networkTypeOfService << 2);
+    public OFMatch setNetworkSourceMask(int networkSource, int networkMask) {
+        this.setField(OFOXMFieldType.IPV4_SRC, networkSource, networkMask);
         return this;
     }
 
     /**
      * Get tp_dst
      *
-     * @return
+     * @return destination port number
      */
     public short getTransportDestination() {
-        return this.transportDestination;
+    	byte networkProtocol = getNetworkProtocol();
+    	switch (networkProtocol) {
+    		case IP_PROTO_TCP:
+    			return (Short)getMatchFieldValue(OFOXMFieldType.TCP_DST);
+    		case IP_PROTO_UDP:
+    			return (Short)getMatchFieldValue(OFOXMFieldType.UDP_DST);
+    		case IP_PROTO_SCTP:
+    			return (Short)getMatchFieldValue(OFOXMFieldType.SCTP_DST);
+    	}
+    	throw new IllegalArgumentException("Network Protocol invalid for extracting port number");
     }
 
     /**
      * Set tp_dst
      *
-     * @param transportDestination
+     * @param transportDestination TCP destination port number
      */
     public OFMatch setTransportDestination(short transportDestination) {
-        this.transportDestination = transportDestination;
+        setTransportSource(IP_PROTO_TCP, transportDestination);
+        return this;
+    }
+
+    /**
+     * Set tp_dst
+     *
+     * @param networkProtocol IP protocol
+     * @param transportDestination Destination Transport port number
+     */
+    public OFMatch setTransportDestination(byte networkProtocol, short transportDestination) {
+        switch (networkProtocol) {
+	        case IP_PROTO_TCP:
+	            this.setField(OFOXMFieldType.TCP_DST, transportDestination);
+	            break;
+	        case IP_PROTO_UDP:
+	            this.setField(OFOXMFieldType.UDP_DST, transportDestination);
+	            break;
+	        case IP_PROTO_SCTP:
+	            this.setField(OFOXMFieldType.SCTP_DST, transportDestination);
+	            break;
+	    }
         return this;
     }
 
     /**
      * Get tp_src
      *
-     * @return
+     * @return transportSource Source Transport port number
      */
     public short getTransportSource() {
-        return this.transportSource;
+    	byte networkProtocol = getNetworkProtocol();
+    	switch (networkProtocol) {
+    		case IP_PROTO_TCP:
+    			return (Short)getMatchFieldValue(OFOXMFieldType.TCP_SRC);
+    		case IP_PROTO_UDP:
+    			return (Short)getMatchFieldValue(OFOXMFieldType.UDP_SRC);
+    		case IP_PROTO_SCTP:
+    			return (Short)getMatchFieldValue(OFOXMFieldType.SCTP_SRC);
+    	}
+    	throw new IllegalArgumentException("Network Protocol invalid for extracting port number");
     }
 
     /**
      * Set tp_src
      *
-     * @param transportSource
+     * @param transportSource TCP source port number
      */
     public OFMatch setTransportSource(short transportSource) {
-        this.transportSource = transportSource;
+        setTransportSource(IP_PROTO_TCP, transportSource);
         return this;
     }
 
     /**
-     * Get wildcards
+     * Set tp_src
      *
-     * @return
+     * @param networkProtocol IP protocol
+     * @param transportSource Source Transport port number
      */
-    public int getWildcards() {
-        return this.wildcards;
-    }
-
-    /**
-     * Get wildcards
-     *
-     * @return
-     */
-    public Wildcards getWildcardObj() {
-        return Wildcards.of(wildcards);
-    }
-
-    /**
-     * Set wildcards
-     *
-     * @param wildcards
-     */
-    public OFMatch setWildcards(int wildcards) {
-        this.wildcards = wildcards;
+    public OFMatch setTransportSource(byte networkProtocol, short transportSource) {
+        switch (networkProtocol) {
+	        case IP_PROTO_TCP:
+	            this.setField(OFOXMFieldType.TCP_SRC, transportSource);
+	            break;
+	        case IP_PROTO_UDP:
+	            this.setField(OFOXMFieldType.UDP_SRC, transportSource);
+	            break;
+	        case IP_PROTO_SCTP:
+	            this.setField(OFOXMFieldType.SCTP_SRC, transportSource);
+	            break;
+	    }
         return this;
     }
 
-    /** set the wildcard using the Wildcards convenience object */
-    public OFMatch setWildcards(Wildcards wildcards) {
-        this.wildcards = wildcards.getInt();
-        return this;
+    public OFMatchType getType() {
+        return type;
     }
 
     /**
-     * Initializes this OFMatch structure with the corresponding data from the
-     * specified packet. Must specify the input port, to ensure that
-     * this.in_port is set correctly. Specify OFPort.NONE or OFPort.ANY if input
-     * port not applicable or available
-     *
-     * @param packetData
-     *            The packet's data
-     * @param inputPort
-     *            the port the packet arrived on
+     * Get the length of this message
+     * @return length
      */
-    public OFMatch loadFromPacket(byte[] packetData, short inputPort) {
-        short scratch;
-        int transportOffset = 34;
-        ByteBuffer packetDataBB = ByteBuffer.wrap(packetData);
-        int limit = packetDataBB.limit();
+    public short getLength() {
+        return length;
+    }
 
-        this.wildcards = 0; // all fields have explicit entries
+    /**
+     * Get the length of this message, unsigned
+     * @return unsigned length
+     */
+    public int getLengthU() {
+        return U16.f(length);
+    }
 
-        this.inputPort = inputPort;
-
-        if (inputPort == OFPort.OFPP_ALL.getValue())
-                                                    this.wildcards |= OFPFW_IN_PORT;
-
-        assert (limit >= 14);
-        // dl dst
-        this.dataLayerDestination = new byte[6];
-        packetDataBB.get(this.dataLayerDestination);
-        // dl src
-        this.dataLayerSource = new byte[6];
-        packetDataBB.get(this.dataLayerSource);
-        // dl type
-        this.dataLayerType = packetDataBB.getShort();
-
-        if (getDataLayerType() != (short) 0x8100) { // need cast to avoid signed
-            // bug
-            setDataLayerVirtualLan((short) 0xffff);
-            setDataLayerVirtualLanPriorityCodePoint((byte) 0);
-        } else {
-            // has vlan tag
-            scratch = packetDataBB.getShort();
-            setDataLayerVirtualLan((short) (0xfff & scratch));
-            setDataLayerVirtualLanPriorityCodePoint((byte) ((0xe000 & scratch) >> 13));
-            this.dataLayerType = packetDataBB.getShort();
+    public short getMatchLength() {
+        return matchLength;
+    }
+    
+    /** Sets match field. In case of existing field, checks for existing value
+     * 
+     * @param matchField Check for uniqueness of field and add matchField
+     */
+    public void setField(OFMatchField newMatchField) {
+        if (this.matchFields == null)
+            this.matchFields = new ArrayList<OFMatchField>();
+        for (OFMatchField matchField: this.matchFields) {
+            if (matchField.getType() == newMatchField.getType()) {
+                matchField.setValue(newMatchField.getValue());
+                matchField.setMask(newMatchField.getMask());
+                return;
+            }
         }
+        this.matchFields.add(newMatchField);
+        this.matchLength += newMatchField.getLength();
+        this.length = U16.t(8*((this.matchLength + 7)/8)); //includes padding
+    }
 
-        switch (getDataLayerType()) {
-            case 0x0800:
-                // ipv4
-                // check packet length
-                scratch = packetDataBB.get();
-                scratch = (short) (0xf & scratch);
-                transportOffset = (packetDataBB.position() - 1)
-                                  + (scratch * 4);
-                // nw tos (dscp)
-                scratch = packetDataBB.get();
-                setNetworkTypeOfService((byte) ((0xfc & scratch) >> 2));
-                // nw protocol
-                packetDataBB.position(packetDataBB.position() + 7);
-                this.networkProtocol = packetDataBB.get();
-                // nw src
-                packetDataBB.position(packetDataBB.position() + 2);
-                this.networkSource = packetDataBB.getInt();
-                // nw dst
-                this.networkDestination = packetDataBB.getInt();
-                packetDataBB.position(transportOffset);
-                break;
-            case 0x0806:
-                // arp
-                int arpPos = packetDataBB.position();
-                // opcode
-                scratch = packetDataBB.getShort(arpPos + 6);
-                setNetworkProtocol((byte) (0xff & scratch));
+    public void setField(OFOXMFieldType matchFieldType, Object matchFieldValue) {
+        OFMatchField matchField = new OFMatchField(matchFieldType, matchFieldValue);
+        setField(matchField);
+    }
 
-                scratch = packetDataBB.getShort(arpPos + 2);
-                // if ipv4 and addr len is 4
-                if (scratch == 0x800 && packetDataBB.get(arpPos + 5) == 4) {
-                    // nw src
-                    this.networkSource = packetDataBB.getInt(arpPos + 14);
-                    // nw dst
-                    this.networkDestination = packetDataBB.getInt(arpPos + 24);
-                } else {
-                    setNetworkSource(0);
-                    setNetworkDestination(0);
+    public void setField(OFOXMFieldType matchFieldType, Object matchFieldValue, Object matchFieldMask) {
+        OFMatchField matchField = new OFMatchField(matchFieldType, matchFieldValue, matchFieldMask);
+        setField(matchField);
+    }
+
+    /**
+     * Returns read-only copies of the matchfields contained in this OFMatch
+     * @return a list of ordered OFMatchField objects
+     */
+    public List<OFMatchField> getMatchFields() {
+        return this.matchFields;
+    }
+
+    /**
+     * Sets the list of matchfields this OFMatch contains
+     * @param matchFields a list of ordered OFMatchField objects
+     */
+    public OFMatch setMatchFields(List<OFMatchField> matchFields) {
+        this.matchFields = matchFields;
+
+        //Recalculate lengths
+        this.matchLength = 4; //No padding
+        if (matchFields != null)
+            for (OFMatchField newMatchField: this.matchFields) 
+                this.matchLength += newMatchField.getLength();
+        this.length = U16.t(8*((this.matchLength + 7)/8)); //includes padding
+        return this;
+    }
+
+    /**
+     * Utility function to wildcard all fields except those specified in the set
+     * @param nonWildcardedFieldTypes set of match field types preserved,
+     * if null all fields are wildcarded
+     */
+    public OFMatch setNonWildcards(Set<OFOXMFieldType> nonWildcardedFieldTypes) {
+        if (nonWildcardedFieldTypes == null) 
+            setMatchFields(null);
+        else if (nonWildcardedFieldTypes.size() == 0) 
+            setMatchFields(null);
+        else {
+            List <OFMatchField> newMatchFields = new ArrayList<OFMatchField>();
+
+            if (nonWildcardedFieldTypes != null) {
+                for (OFMatchField matchField: matchFields) {
+                    OFOXMFieldType type = matchField.getType();
+                    if (nonWildcardedFieldTypes.contains(type))
+                        newMatchFields.add(matchField);
                 }
-                break;
-            default:
-                // Not ARP or IP. Wildcard NW_DST and NW_SRC
-                this.wildcards |= OFPFW_NW_DST_ALL |
-                                  OFPFW_NW_SRC_ALL |
-                                  OFPFW_NW_PROTO |
-                                  OFPFW_NW_TOS;
-                setNetworkTypeOfService((byte) 0);
-                setNetworkProtocol((byte) 0);
-                setNetworkSource(0);
-                setNetworkDestination(0);
-                break;
-        }
-
-        switch (getNetworkProtocol()) {
-            case 0x01:
-                // icmp
-                // type
-                this.transportSource = U8.f(packetDataBB.get());
-                // code
-                this.transportDestination = U8.f(packetDataBB.get());
-                break;
-            case 0x06:
-                // tcp
-                // tcp src
-                this.transportSource = packetDataBB.getShort();
-                // tcp dest
-                this.transportDestination = packetDataBB.getShort();
-                break;
-            case 0x11:
-                // udp
-                // udp src
-                this.transportSource = packetDataBB.getShort();
-                // udp dest
-                this.transportDestination = packetDataBB.getShort();
-                break;
-            default:
-                // Unknown network proto.
-                this.wildcards |= OFPFW_TP_DST | OFPFW_TP_SRC;
-                setTransportDestination((short) 0);
-                setTransportSource((short) 0);
-                break;
+            }
+            setMatchFields(newMatchFields);
         }
         return this;
     }
 
-    /**
-     * Read this message off the wire from the specified ByteBuffer
-     *
-     * @param data
-     */
-    public void readFrom(ChannelBuffer data) {
-        this.wildcards = data.readInt();
-        this.inputPort = data.readShort();
-        this.dataLayerSource = new byte[6];
-        data.readBytes(this.dataLayerSource);
-        this.dataLayerDestination = new byte[6];
-        data.readBytes(this.dataLayerDestination);
-        this.dataLayerVirtualLan = data.readShort();
-        this.dataLayerVirtualLanPriorityCodePoint = data.readByte();
-        data.readByte(); // pad
-        this.dataLayerType = data.readShort();
-        this.networkTypeOfService = data.readByte();
-        this.networkProtocol = data.readByte();
-        data.readByte(); // pad
-        data.readByte(); // pad
-        this.networkSource = data.readInt();
-        this.networkDestination = data.readInt();
-        this.transportSource = data.readShort();
-        this.transportDestination = data.readShort();
+    public void readFrom(ByteBuffer data) {
+        byte[] dataLayerAddress = new byte[OFPhysicalPort.OFP_ETH_ALEN];
+        byte[] dataLayerAddressMask = new byte[OFPhysicalPort.OFP_ETH_ALEN];
+        int networkAddress;
+        int networkAddressMask;
+        int wildcards;
+        short dataLayerType = 0;
+        byte networkProtocol = 0;
+        byte networkTOS;
+        short transportNumber;
+        int mplsLabel;
+        byte mplsTC;
+
+        this.type = OFMatchType.values()[data.getShort()];
+        this.matchLength = data.getShort();
+        this.length = U16.t(8*((this.matchLength + 7)/8)); //includes padding
+        int remaining = matchLength - 4; //length - sizeof(type and length)
+        int end = data.position() + remaining; //includes padding in case of STANDARD match
+
+        if (type == OFMatchType.OXM) {
+            int padLength = length - matchLength;
+            end += padLength; // including pad
+            
+            if (data.remaining() < remaining)
+                remaining = data.remaining();
+            this.matchFields = new ArrayList<OFMatchField>();
+            while (remaining >= OFMatchField.MINIMUM_LENGTH) {
+                OFMatchField matchField = new OFMatchField();
+                matchField.readFrom(data);
+                this.matchFields.add(matchField);
+                remaining -= U32.f(matchField.getLength()); //value length + header length
+            }
+        } else {
+            this.setField(OFOXMFieldType.IN_PORT, data.getInt());
+            wildcards = data.getInt(); 
+
+            if ((wildcards & OFMatchWildcardMask.ALL.getValue()) == 0) {
+                data.position(end);
+                return;
+            }
+
+            data.get(dataLayerAddress);
+            data.get(dataLayerAddressMask);
+            this.setField(OFOXMFieldType.ETH_SRC, dataLayerAddress.clone(), dataLayerAddressMask.clone());
+        
+            data.get(dataLayerAddress);
+            data.get(dataLayerAddressMask);
+            this.setField(OFOXMFieldType.ETH_DST, dataLayerAddress.clone(), dataLayerAddressMask.clone());
+
+            if ((wildcards & OFMatchWildcardMask.DL_VLAN.getValue()) == 0)
+                setDataLayerVirtualLan(data.getShort());
+            else
+                data.getShort(); //skip
+                
+            if ((wildcards & OFMatchWildcardMask.DL_VLAN_PCP.getValue()) == 0)
+                setDataLayerVirtualLanPriorityCodePoint(data.get());
+            else
+                data.get(); //skip
+
+            data.get(); //pad
+            
+            if ((wildcards & OFMatchWildcardMask.DL_TYPE.getValue()) == 0) {
+                dataLayerType = data.getShort();
+                setDataLayerType(dataLayerType);
+            } else
+                data.getShort(); //skip
+
+            if ((dataLayerType != ETH_TYPE_IPV4) && (dataLayerType != ETH_TYPE_ARP) && (dataLayerType != ETH_TYPE_VLAN) && 
+            		(dataLayerType != ETH_TYPE_MPLS_UNICAST) && (dataLayerType != ETH_TYPE_MPLS_MULTICAST)) {
+                data.position(end);
+                return;
+            }
+            
+            if ((wildcards & OFMatchWildcardMask.NW_TOS.getValue()) == 0) {
+            	networkTOS = data.get();
+                setNetworkTypeOfService(networkTOS);
+            } else
+                data.get(); //skip
+
+            if ((wildcards & OFMatchWildcardMask.NW_PROTO.getValue()) == 0) {
+                networkProtocol = data.get();
+                setNetworkProtocol(networkProtocol);
+            } else
+                data.get(); //skip
+
+            networkAddress = data.getInt();
+            networkAddressMask = data.getInt();
+            if (networkAddress != 0)
+                this.setField(OFOXMFieldType.IPV4_SRC, networkAddress, networkAddressMask);
+
+            networkAddress = data.getInt();
+            networkAddressMask = data.getInt();
+            if (networkAddress != 0)
+                this.setField(OFOXMFieldType.IPV4_DST, networkAddress, networkAddressMask);
+
+            transportNumber = data.getShort();
+            if ((wildcards & OFMatchWildcardMask.TP_SRC.getValue()) == 0) {
+                setTransportSource(networkProtocol, transportNumber);
+            }
+
+            transportNumber = data.getShort();
+            if ((wildcards & OFMatchWildcardMask.TP_DST.getValue()) == 0) {
+                setTransportDestination(networkProtocol, transportNumber);
+            }
+
+            mplsLabel = data.getInt();
+            mplsTC = data.get();
+            if ((dataLayerType == ETH_TYPE_MPLS_UNICAST) ||  
+            		(dataLayerType == ETH_TYPE_MPLS_MULTICAST)) {
+            	if ((wildcards & OFMatchWildcardMask.MPLS_LABEL.getValue()) == 0) 
+            		this.setField(OFOXMFieldType.MPLS_LABEL, mplsLabel);
+            	if ((wildcards & OFMatchWildcardMask.MPLS_TC.getValue()) == 0)
+            		this.setField(OFOXMFieldType.MPLS_TC, mplsTC);
+            } 
+            
+            data.get(); //pad
+            data.get(); //pad
+            data.get(); //pad
+            
+            this.setField(OFOXMFieldType.METADATA, data.getLong(), data.getLong());            
+        }
+        
+        data.position(end); 
     }
 
-    /**
-     * Write this message's binary format to the specified ByteBuffer
-     *
-     * @param data
-     */
-    public void writeTo(ChannelBuffer data) {
-        data.writeInt(wildcards);
-        data.writeShort(inputPort);
-        data.writeBytes(this.dataLayerSource);
-        data.writeBytes(this.dataLayerDestination);
-        data.writeShort(dataLayerVirtualLan);
-        data.writeByte(dataLayerVirtualLanPriorityCodePoint);
-        data.writeByte((byte) 0x0); // pad
-        data.writeShort(dataLayerType);
-        data.writeByte(networkTypeOfService);
-        data.writeByte(networkProtocol);
-        data.writeByte((byte) 0x0); // pad
-        data.writeByte((byte) 0x0); // pad
-        data.writeInt(networkSource);
-        data.writeInt(networkDestination);
-        data.writeShort(transportSource);
-        data.writeShort(transportDestination);
+    public void writeTo(ByteBuffer data) {
+        short matchLength = getMatchLength();
+        data.putShort((short)this.type.ordinal());
+        data.putShort(matchLength); //length does not include padding
+        if (matchFields != null)
+            for (OFMatchField matchField : matchFields) 
+                matchField.writeTo(data);
+        
+        int padLength = 8*((matchLength + 7)/8) - matchLength;
+        for (;padLength>0;padLength--)
+            data.put((byte)0); //pad
     }
 
-    @Override
     public int hashCode() {
-        final int prime = 131;
+        final int prime = 227;
         int result = 1;
-        result = prime * result + Arrays.hashCode(dataLayerDestination);
-        result = prime * result + Arrays.hashCode(dataLayerSource);
-        result = prime * result + dataLayerType;
-        result = prime * result + dataLayerVirtualLan;
-        result = prime * result + dataLayerVirtualLanPriorityCodePoint;
-        result = prime * result + inputPort;
-        result = prime * result + networkDestination;
-        result = prime * result + networkProtocol;
-        result = prime * result + networkSource;
-        result = prime * result + networkTypeOfService;
-        result = prime * result + transportDestination;
-        result = prime * result + transportSource;
-        result = prime * result + wildcards;
+        result = prime * result + ((matchFields == null) ? 0 : matchFields.hashCode());
         return result;
     }
 
@@ -669,312 +808,193 @@ public class OFMatch implements Cloneable, Serializable {
         if (this == obj) {
             return true;
         }
-        if (obj == null) {
+        if (!super.equals(obj)) {
             return false;
         }
-        if (!(obj instanceof OFMatch)) {
+        if (!(obj instanceof OFMatchField)) {
             return false;
         }
         OFMatch other = (OFMatch) obj;
-        if (!Arrays.equals(dataLayerDestination, other.dataLayerDestination)) {
-            return false;
-        }
-        if (!Arrays.equals(dataLayerSource, other.dataLayerSource)) {
-            return false;
-        }
-        if (dataLayerType != other.dataLayerType) {
-            return false;
-        }
-        if (dataLayerVirtualLan != other.dataLayerVirtualLan) {
-            return false;
-        }
-        if (dataLayerVirtualLanPriorityCodePoint != other.dataLayerVirtualLanPriorityCodePoint) {
-            return false;
-        }
-        if (inputPort != other.inputPort) {
-            return false;
-        }
-        if (networkDestination != other.networkDestination) {
-            return false;
-        }
-        if (networkProtocol != other.networkProtocol) {
-            return false;
-        }
-        if (networkSource != other.networkSource) {
-            return false;
-        }
-        if (networkTypeOfService != other.networkTypeOfService) {
-            return false;
-        }
-        if (transportDestination != other.transportDestination) {
-            return false;
-        }
-        if (transportSource != other.transportSource) {
-            return false;
-        }
-        if ((wildcards & OFMatch.OFPFW_ALL) != (other.wildcards & OFPFW_ALL)) { // only
-            // consider
-            // allocated
-            // part
-            // of
-            // wildcards
+        if (matchFields == null) {
+            if (other.matchFields != null)
+                return false;
+        } else if (!matchFields.equals(other.matchFields)) {
             return false;
         }
         return true;
     }
 
-    /**
-     * Implement clonable interface
+    /* (non-Javadoc)
+     * @see java.lang.Object#clone()
      */
     @Override
     public OFMatch clone() {
+        OFMatch match = new OFMatch();
         try {
-            OFMatch ret = (OFMatch) super.clone();
-            ret.dataLayerDestination = this.dataLayerDestination.clone();
-            ret.dataLayerSource = this.dataLayerSource.clone();
-            return ret;
+            List<OFMatchField> neoMatchFields = new LinkedList<OFMatchField>();
+            for(OFMatchField matchField: this.matchFields)
+                neoMatchFields.add((OFMatchField) matchField.clone());
+            match.setMatchFields(neoMatchFields);
+            return match;
         } catch (CloneNotSupportedException e) {
+            // Won't happen
             throw new RuntimeException(e);
         }
     }
 
     /**
-     * matching two OFMatch
-     * @param toCompare
+     * Load and return a new OFMatch based on supplied packetData, see
+     * {@link #loadFromPacket(byte[], short)} for details.
+     * 
+     * @param packetData
+     * @param inputPort
      * @return
      */
-    public boolean match(OFMatch toCompare) {
-        if ((wildcards & OFPFW_IN_PORT) == 0 &&
-                this.inputPort != toCompare.getInputPort())
-            return false;
-        if ((wildcards & OFPFW_DL_DST) == 0 &&
-                !Arrays.equals(this.dataLayerDestination, toCompare.getDataLayerDestination()))
-            return false;
-        if ((wildcards & OFPFW_DL_SRC) == 0 &&
-                !Arrays.equals(this.dataLayerSource, toCompare.getDataLayerSource()))
-            return false;
-        if ((wildcards & OFPFW_DL_TYPE) == 0
-                && this.dataLayerType != toCompare.getDataLayerType())
-            return false;
-        if ((wildcards & OFPFW_DL_VLAN) == 0 &&
-                this.dataLayerVirtualLan != toCompare.getDataLayerVirtualLan())
-            return false;
-        if ((wildcards & OFPFW_DL_VLAN_PCP) == 0 &&
-                this.dataLayerVirtualLanPriorityCodePoint != toCompare.getDataLayerVirtualLanPriorityCodePoint())
-            return false;
-        if ((wildcards & OFPFW_NW_PROTO) == 0 &&
-                this.networkProtocol != toCompare.getNetworkProtocol())
-            return false;
-        if ((wildcards & OFPFW_NW_TOS) == 0 &&
-                this.networkTypeOfService != toCompare.getNetworkTypeOfService())
-            return false;
-        //compare network layer src/dst
-
-        int dstmasklen = getNetworkDestinationMaskLen();
-        int srcmasklen = getNetworkSourceMaskLen();
-        if (dstmasklen >= 32 && networkDestination != toCompare.getNetworkDestination())
-            return false;
-        if (srcmasklen >= 32 && networkSource != toCompare.getNetworkSource())
-            return false;
-        int dstmask = ~((1 << (32 - dstmasklen)) - 1);
-        int srcmask = ~((1 << (32 - srcmasklen)) - 1);
-        if (dstmasklen < 32 &&
-                (networkDestination & dstmask) != (toCompare.getNetworkDestination() & dstmask))
-            return false;
-        if (srcmasklen < 32 &&
-                (networkSource & srcmask) != (toCompare.getNetworkSource() & srcmask))
-            return false;
-        //layer 4
-        if ((wildcards & OFPFW_TP_DST) == 0 &&
-                this.transportDestination != toCompare.getTransportDestination())
-            return false;
-        if ((wildcards & OFPFW_TP_SRC) == 0 &&
-                this.transportSource != toCompare.getTransportSource())
-            return false;
-        return true;
+    public static OFMatch load(byte[] packetData, int inPort) {
+        OFMatch ofm = new OFMatch();
+        return ofm.loadFromPacket(packetData, inPort);
     }
 
     /**
-     * Output a dpctl-styled string, i.e., only list the elements that are not
-     * wildcarded A match-everything OFMatch outputs "OFMatch[]"
-     *
-     * @return
-     *         "OFMatch[dl_src:00:20:01:11:22:33,nw_src:192.168.0.0/24,tp_dst:80]"
+     * Initializes this OFMatch structure with the corresponding data from the
+     * specified packet.
+     * 
+     * Must specify the input port, to ensure that this.in_port is set
+     * correctly.
+     * 
+     * Specify OFPort.NONE or OFPort.ANY if input port not applicable or
+     * available
+     * 
+     * @param packetData
+     *            The packet's data
+     * @param inputPort
+     *            the port the packet arrived on
+     */
+    public OFMatch loadFromPacket(byte[] packetData, int inPort) {
+        short scratch;
+        byte[] dataLayerAddress = new byte[OFPhysicalPort.OFP_ETH_ALEN];
+        short dataLayerType = 0;
+        byte networkProtocol = 0;
+
+        int transportOffset = 34;
+        ByteBuffer packetDataBB = ByteBuffer.wrap(packetData);
+        int limit = packetDataBB.limit();
+
+        setInPort(inPort);
+
+        //TODO: Extend to support more packet types
+        assert (limit >= 14);
+        // dl dst
+        packetDataBB.get(dataLayerAddress);
+        setDataLayerDestination(dataLayerAddress.clone());
+        // dl src
+        packetDataBB.get(dataLayerAddress);
+        setDataLayerSource(dataLayerAddress.clone());
+        // dl type
+        dataLayerType = packetDataBB.getShort();
+        setDataLayerType(dataLayerType);
+        
+        if (dataLayerType == (short) ETH_TYPE_VLAN) { // need cast to avoid signed
+            // has vlan tag
+            scratch = packetDataBB.getShort();
+            setDataLayerVirtualLan((short) (0xfff & scratch));
+            setDataLayerVirtualLanPriorityCodePoint((byte) ((0xe000 & scratch) >> 13));
+            dataLayerType = packetDataBB.getShort();
+        }
+
+        //TODO: Add support for IPv6
+        switch (dataLayerType) {
+        case ETH_TYPE_IPV4: // ipv4
+            // check packet length
+            scratch = packetDataBB.get();
+            scratch = (short) (0xf & scratch);
+            transportOffset = (packetDataBB.position() - 1) + (scratch * 4);
+            // nw tos (dscp and ecn)
+            setNetworkTypeOfService(packetDataBB.get());
+            // nw protocol
+            packetDataBB.position(packetDataBB.position() + 7);
+            networkProtocol = packetDataBB.get();
+            setNetworkProtocol(networkProtocol);
+            // nw src
+            packetDataBB.position(packetDataBB.position() + 2);
+            setNetworkSource(dataLayerType, packetDataBB.getInt());
+            // nw dst
+            setNetworkDestination(dataLayerType, packetDataBB.getInt());
+            packetDataBB.position(transportOffset);
+            break;
+            
+        case ETH_TYPE_ARP: // arp
+            int arpPos = packetDataBB.position();
+            // opcode
+            scratch = packetDataBB.getShort(arpPos + 6);
+            this.setField(OFOXMFieldType.ARP_OP, ((short) (0xff & scratch)));
+
+            scratch = packetDataBB.getShort(arpPos + 2);
+            // if ipv4 and addr len is 4
+            if (scratch == 0x800 && packetDataBB.get(arpPos + 5) == 4) {
+                // nw src
+                this.setField(OFOXMFieldType.ARP_SPA, packetDataBB.getInt(arpPos + 14));
+                // nw dst
+                this.setField(OFOXMFieldType.ARP_TPA, packetDataBB.getInt(arpPos + 24));
+            } 
+            return this;
+            
+        default: //No OXM field added
+            return this;
+        }
+
+        switch (networkProtocol) {
+        case IP_PROTO_ICMP: 
+            // icmp type
+            this.setField(OFOXMFieldType.ICMPV4_TYPE, packetDataBB.get());
+            // code
+            this.setField(OFOXMFieldType.ICMPV4_CODE, packetDataBB.get());
+            break;
+        case IP_PROTO_TCP:
+        case IP_PROTO_UDP:
+        case IP_PROTO_SCTP: 
+            setTransportSource(networkProtocol, packetDataBB.getShort());
+            setTransportDestination(networkProtocol, packetDataBB.getShort());
+            break;
+        default:
+            break;
+        }
+        return this;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
      */
     @Override
     public String toString() {
-        String str = "";
-
-        // l1
-        if ((wildcards & OFPFW_IN_PORT) == 0)
-                                             str += "," + STR_IN_PORT + "="
-                                                    + U16.f(this.inputPort);
-
-        // l2
-        if ((wildcards & OFPFW_DL_DST) == 0)
-                                            str += ","
-                                                   + STR_DL_DST
-                                                   + "="
-                                                   + HexString.toHexString(this.dataLayerDestination);
-        if ((wildcards & OFPFW_DL_SRC) == 0)
-                                            str += ","
-                                                   + STR_DL_SRC
-                                                   + "="
-                                                   + HexString.toHexString(this.dataLayerSource);
-        if ((wildcards & OFPFW_DL_TYPE) == 0)
-                                             str += ","
-                                                    + STR_DL_TYPE
-                                                    + "=0x"
-                                                    + Integer.toHexString(U16.f(this.dataLayerType));
-        if ((wildcards & OFPFW_DL_VLAN) == 0)
-                                             str += ","
-                                                    + STR_DL_VLAN
-                                                    + "=0x"
-                                                    + Integer.toHexString(U16.f(this.dataLayerVirtualLan));
-        if ((wildcards & OFPFW_DL_VLAN_PCP) == 0)
-                                                 str += ","
-                                                        + STR_DL_VLAN_PCP
-                                                        + "="
-                                                        + Integer.toHexString(U8.f(this.dataLayerVirtualLanPriorityCodePoint));
-
-        // l3
-        if (getNetworkDestinationMaskLen() > 0)
-                                               str += ","
-                                                      + STR_NW_DST
-                                                      + "="
-                                                      + cidrToString(networkDestination,
-                                                                     getNetworkDestinationMaskLen());
-        if (getNetworkSourceMaskLen() > 0)
-                                          str += ","
-                                                 + STR_NW_SRC
-                                                 + "="
-                                                 + cidrToString(networkSource,
-                                                                getNetworkSourceMaskLen());
-        if ((wildcards & OFPFW_NW_PROTO) == 0)
-                                              str += "," + STR_NW_PROTO
-                                                     + "="
-                                                     + this.networkProtocol;
-        if ((wildcards & OFPFW_NW_TOS) == 0)
-                                            str += ","
-                                                   + STR_NW_TOS
-                                                   + "="
-                                                   + this.getNetworkTypeOfService();
-
-        // l4
-        if ((wildcards & OFPFW_TP_DST) == 0)
-                                            str += ","
-                                                   + STR_TP_DST
-                                                   + "="
-                                                   + this.transportDestination;
-        if ((wildcards & OFPFW_TP_SRC) == 0)
-                                            str += "," + STR_TP_SRC + "="
-                                                   + this.transportSource;
-        if ((str.length() > 0) && (str.charAt(0) == ','))
-                                                         str = str.substring(1); // trim
-                                                                                 // the
-                                                                                 // leading
-                                                                                 // ","
-        // done
-        return "OFMatch[" + str + "]";
+        return "OFMatch [type=" + type + ", length=" + length + ", matchFields=" + matchFields + "]";
     }
 
     /**
-     * Return a string including all match fields, regardless whether they
-     * are wildcarded or not.
+     * Set the networkSource or networkDestination address and their OXM
+     * field mask from the CIDR string
+     *
+     * @param cidr
+     *            "192.168.0.0/16" or "172.16.1.5"
+     * @param which
+     *            one of IPV4_DST or IPV4_SRC
+     * @throws IllegalArgumentException
      */
-    public String toStringUnmasked() {
-        String str = "";
+    private void setNetworkAddressFromCIDR(OFMatch m, String cidr, OFOXMFieldType which)
+                 throws IllegalArgumentException {
+        String values[] = cidr.split("/");
+        String[] ip_str = values[0].split("\\.");
+        int ip = 0;
+        ip += Integer.valueOf(ip_str[0]) << 24;
+        ip += Integer.valueOf(ip_str[1]) << 16;
+        ip += Integer.valueOf(ip_str[2]) << 8;
+        ip += Integer.valueOf(ip_str[3]);
+        int prefix = 32; // all bits are fixed, by default
 
-        // l1
-        str += STR_IN_PORT + "=" + U16.f(this.inputPort);
-
-        // l2
-        str += "," + STR_DL_DST + "="
-                + HexString.toHexString(this.dataLayerDestination);
-        str += "," + STR_DL_SRC + "="
-                + HexString.toHexString(this.dataLayerSource);
-        str += "," + STR_DL_TYPE + "=0x"
-                + Integer.toHexString(U16.f(this.dataLayerType));
-        str += "," + STR_DL_VLAN + "=0x"
-                + Integer.toHexString(U16.f(this.dataLayerVirtualLan));
-        str += "," + STR_DL_VLAN_PCP + "="
-                + Integer.toHexString(U8.f(this.dataLayerVirtualLanPriorityCodePoint));
-
-        // l3
-        str += "," + STR_NW_DST + "="
-                + cidrToString(networkDestination,
-                               getNetworkDestinationMaskLen());
-        str += "," + STR_NW_SRC + "="
-                + cidrToString(networkSource,
-                               getNetworkSourceMaskLen());
-        str += "," + STR_NW_PROTO + "=" + this.networkProtocol;
-        str += "," + STR_NW_TOS + "=" + this.getNetworkTypeOfService();
-
-        // l4
-        str += "," + STR_TP_DST + "=" + this.transportDestination;
-        str += "," + STR_TP_SRC + "=" + this.transportSource;
-
-        // wildcards
-        str += ", wildcards=" + debugWildCards(wildcards);
-        return "OFMatch[" + str + "]";
-    }
-
-    /**
-     * debug a set of wildcards
-     */
-    public static String debugWildCards(int wildcards) {
-        String str = "";
-
-        // l1
-        if ((wildcards & OFPFW_IN_PORT) != 0) str += "|" + STR_IN_PORT;
-
-        // l2
-        if ((wildcards & OFPFW_DL_DST) != 0) str += "|" + STR_DL_DST;
-        if ((wildcards & OFPFW_DL_SRC) != 0) str += "|" + STR_DL_SRC;
-        if ((wildcards & OFPFW_DL_TYPE) != 0) str += "|" + STR_DL_TYPE;
-        if ((wildcards & OFPFW_DL_VLAN) != 0) str += "|" + STR_DL_VLAN;
-        if ((wildcards & OFPFW_DL_VLAN_PCP) != 0)
-                                                 str += "|"
-                                                        + STR_DL_VLAN_PCP;
-
-        int nwDstMask = Math.max(32 - ((wildcards & OFPFW_NW_DST_MASK) >> OFPFW_NW_DST_SHIFT),
-                                 0);
-        int nwSrcMask = Math.max(32 - ((wildcards & OFPFW_NW_SRC_MASK) >> OFPFW_NW_SRC_SHIFT),
-                                 0);
-
-        // l3
-        if (nwDstMask < 32)
-                           str += "|" + STR_NW_DST + "(/" + nwDstMask + ")";
-
-        if (nwSrcMask < 32)
-                           str += "|" + STR_NW_SRC + "(/" + nwSrcMask + ")";
-
-        if ((wildcards & OFPFW_NW_PROTO) != 0) str += "|" + STR_NW_PROTO;
-        if ((wildcards & OFPFW_NW_TOS) != 0) str += "|" + STR_NW_TOS;
-
-        // l4
-        if ((wildcards & OFPFW_TP_DST) != 0) str += "|" + STR_TP_DST;
-        if ((wildcards & OFPFW_TP_SRC) != 0) str += "|" + STR_TP_SRC;
-        if ((str.length() > 0) && (str.charAt(0) == '|'))
-                                                         str = str.substring(1); // trim
-                                                                                 // the
-                                                                                 // leading
-                                                                                 // ","
-        // done
-        return str;
-    }
-
-    private String cidrToString(int ip, int prefix) {
-        String str;
-        if (prefix >= 32) {
-            str = ipToString(ip);
-        } else {
-            // use the negation of mask to fake endian magic
-            int mask = ~((1 << (32 - prefix)) - 1);
-            str = ipToString(ip & mask) + "/" + prefix;
-        }
-
-        return str;
+        if (values.length >= 2) 
+        	prefix = Integer.valueOf(values[1]);
+        int mask = (Integer.MAX_VALUE - 1) << (32 - prefix);
+        m.setField(which, ip, mask);
     }
 
     /**
@@ -1019,127 +1039,84 @@ public class OFMatch implements Cloneable, Serializable {
      * @throws IllegalArgumentException
      *             on unexpected key or value
      */
-
-    public void fromString(String match) throws IllegalArgumentException {
+    public static OFMatch fromString(String match) throws IllegalArgumentException {
+    	OFMatch m = new OFMatch();
         if (match.equals("") || match.equalsIgnoreCase("any")
             || match.equalsIgnoreCase("all") || match.equals("[]"))
-                                                                   match = "OFMatch[]";
+        	match = "OFMatch[]";
+        
         String[] tokens = match.split("[\\[,\\]]");
         String[] values;
+        byte networkProtocol = 0;
         int initArg = 0;
-        if (tokens[0].equals("OFMatch")) initArg = 1;
-        this.wildcards = OFPFW_ALL;
+        if (tokens[0].equals("OFMatch")) 
+        	initArg = 1;
         int i;
         for (i = initArg; i < tokens.length; i++) {
             values = tokens[i].split("=");
             if (values.length != 2)
-                                   throw new IllegalArgumentException(
-                                                                      "Token "
-                                                                              + tokens[i]
-                                                                              + " does not have form 'key=value' parsing "
-                                                                              + match);
-            values[0] = values[0].toLowerCase(); // try to make this case insens
-            if (values[0].equals(STR_IN_PORT)
-                || values[0].equals("input_port")) {
-                this.inputPort = U16.t(Integer.valueOf(values[1]));
-                this.wildcards &= ~OFPFW_IN_PORT;
-            } else if (values[0].equals(STR_DL_DST)
-                       || values[0].equals("eth_dst")) {
-                this.dataLayerDestination = HexString.fromHexString(values[1]);
-                this.wildcards &= ~OFPFW_DL_DST;
-            } else if (values[0].equals(STR_DL_SRC)
-                       || values[0].equals("eth_src")) {
-                this.dataLayerSource = HexString.fromHexString(values[1]);
-                this.wildcards &= ~OFPFW_DL_SRC;
-            } else if (values[0].equals(STR_DL_TYPE)
-                       || values[0].equals("eth_type")) {
+                   throw new IllegalArgumentException(
+                                                      "Token " + tokens[i]
+                                                              + " does not have form 'key=value' parsing "
+                                                              + match);
+            values[0] = values[0].toLowerCase(); // try to make this case insensitive
+            if (values[0].equals(OFOXMFieldType.IN_PORT.getName())
+            		|| values[0].equals("input_port")) {
+                m.setInPort(U16.t(Integer.valueOf(values[1])));
+            } else if (values[0].equals(OFOXMFieldType.ETH_DST.getName())
+                    || values[0].equals("dl_dst")) {
+                m.setDataLayerDestination(HexString.fromHexString(values[1]));
+            } else if (values[0].equals(OFOXMFieldType.ETH_SRC.getName())
+                    || values[0].equals("dl_src")) {
+            	m.setDataLayerSource(HexString.fromHexString(values[1]));
+            } else if (values[0].equals(OFOXMFieldType.ETH_TYPE.getName())
+                    || values[0].equals("dl_type")) {
                 if (values[1].startsWith("0x"))
-                    this.dataLayerType = U16.t(Integer.valueOf(values[1].replaceFirst("0x",
-                                                                                      ""),
-                                                               16));
+                    m.setDataLayerType(U16.t(Integer.valueOf(values[1].replaceFirst("0x", ""), 16)));
                 else
-                    this.dataLayerType = U16.t(Integer.valueOf(values[1]));
-                this.wildcards &= ~OFPFW_DL_TYPE;
-            } else if (values[0].equals(STR_DL_VLAN)) {
+                    m.setDataLayerType(U16.t(Integer.valueOf(values[1])));
+            } else if (values[0].equals(OFOXMFieldType.VLAN_VID.getName()) 
+            		|| values[0].equals("dl_vlan")) {
                 if (values[1].startsWith("0x"))
-                    this.dataLayerVirtualLan = U16.t(Integer.valueOf(values[1].replaceFirst("0x",
-                                                                                            ""),
-                                                                     16));
+                    m.setDataLayerVirtualLan(U16.t(Integer.valueOf(values[1].replaceFirst("0x", ""), 16)));
                 else
-                    this.dataLayerVirtualLan = U16.t(Integer.valueOf(values[1]));
-                this.wildcards &= ~OFPFW_DL_VLAN;
-            } else if (values[0].equals(STR_DL_VLAN_PCP)) {
-                this.dataLayerVirtualLanPriorityCodePoint = U8.t(Short.valueOf(values[1]));
-                this.wildcards &= ~OFPFW_DL_VLAN_PCP;
-            } else if (values[0].equals(STR_NW_DST)
-                       || values[0].equals("ip_dst")) {
-                setFromCIDR(values[1], STR_NW_DST);
-            } else if (values[0].equals(STR_NW_SRC)
-                       || values[0].equals("ip_src")) {
-                setFromCIDR(values[1], STR_NW_SRC);
-            } else if (values[0].equals(STR_NW_PROTO)) {
+                    m.setDataLayerVirtualLan(U16.t(Integer.valueOf(values[1])));
+            } else if (values[0].equals(OFOXMFieldType.VLAN_PCP.getName()) 
+            		|| values[0].equals("dl_vlan_pcp")) {
+                m.setDataLayerVirtualLanPriorityCodePoint(U8.t(Short.valueOf(values[1])));
+            } else if (values[0].equals(OFOXMFieldType.IPV4_DST.getName())
+            		|| values[0].equals("ip_dst") || values[0].equals("nw_dst")) {
+                m.setNetworkAddressFromCIDR(m, values[1], OFOXMFieldType.IPV4_DST);
+            } else if (values[0].equals(OFOXMFieldType.IPV4_SRC.getName())
+            		|| values[0].equals("ip_src") || values[0].equals("nw_src")) {
+            	m.setNetworkAddressFromCIDR(m, values[1], OFOXMFieldType.IPV4_SRC);
+            } else if (values[0].equals(OFOXMFieldType.IP_PROTO.getName()) || values[0].equals("nw_proto")) {
                 if (values[1].startsWith("0x"))
-                    this.networkProtocol = U8.t(Short.valueOf(values[1].replaceFirst("0x",""),16));
+                    networkProtocol = U8.t(Short.valueOf(values[1].replaceFirst("0x",""),16));
                 else
-                    this.networkProtocol = U8.t(Short.valueOf(values[1]));
-                this.wildcards &= ~OFPFW_NW_PROTO;
-            } else if (values[0].equals(STR_NW_TOS)) {
-                this.setNetworkTypeOfService(U8.t(Short.valueOf(values[1])));
-                this.wildcards &= ~OFPFW_NW_TOS;
-            } else if (values[0].equals(STR_TP_DST)) {
-                this.transportDestination = U16.t(Integer.valueOf(values[1]));
-                this.wildcards &= ~OFPFW_TP_DST;
-            } else if (values[0].equals(STR_TP_SRC)) {
-                this.transportSource = U16.t(Integer.valueOf(values[1]));
-                this.wildcards &= ~OFPFW_TP_SRC;
+                	networkProtocol = U8.t(Short.valueOf(values[1]));
+            	m.setNetworkProtocol(networkProtocol);
+            } else if (values[0].equals(OFOXMFieldType.IP_DSCP.getName()) 
+            		|| values[0].equals("nw_tos")) {
+                m.setNetworkTypeOfService(U8.t(Short.valueOf(values[1])));
+            } else if (values[0].equals(OFOXMFieldType.TCP_DST.getName())
+            		|| values[0].equals(OFOXMFieldType.UDP_DST.getName())
+            		|| values[0].equals("tp_dst")) {
+            	if (networkProtocol == 0)
+                    throw new IllegalArgumentException("specifying transport src/dst without establishing nw_proto first");
+                m.setTransportDestination(networkProtocol, U16.t(Integer.valueOf(values[1])));
+            } else if (values[0].equals(OFOXMFieldType.TCP_SRC.getName())
+            		|| values[0].equals(OFOXMFieldType.UDP_SRC.getName())
+            		|| values[0].equals("tp_src")) {
+            	if (networkProtocol == 0)
+                    throw new IllegalArgumentException("specifying transport src/dst without establishing nw_proto first");
+                m.setTransportSource(networkProtocol, U16.t(Integer.valueOf(values[1])));
             } else {
                 throw new IllegalArgumentException("unknown token "
                                                    + tokens[i] + " parsing "
                                                    + match);
             }
         }
+        return m;
     }
-
-    /**
-     * Set the networkSource or networkDestionation address and their wildcards
-     * from the CIDR string
-     *
-     * @param cidr
-     *            "192.168.0.0/16" or "172.16.1.5"
-     * @param which
-     *            one of STR_NW_DST or STR_NW_SRC
-     * @throws IllegalArgumentException
-     */
-    private
-            void
-            setFromCIDR(String cidr, String which)
-                                                  throws IllegalArgumentException {
-        String values[] = cidr.split("/");
-        String[] ip_str = values[0].split("\\.");
-        int ip = 0;
-        ip += Integer.valueOf(ip_str[0]) << 24;
-        ip += Integer.valueOf(ip_str[1]) << 16;
-        ip += Integer.valueOf(ip_str[2]) << 8;
-        ip += Integer.valueOf(ip_str[3]);
-        int prefix = 32; // all bits are fixed, by default
-
-        if (values.length >= 2) prefix = Integer.valueOf(values[1]);
-        int mask = 32 - prefix;
-        if (which.equals(STR_NW_DST)) {
-            this.networkDestination = ip;
-            this.wildcards = (wildcards & ~OFPFW_NW_DST_MASK)
-                             | (mask << OFPFW_NW_DST_SHIFT);
-        } else if (which.equals(STR_NW_SRC)) {
-            this.networkSource = ip;
-            this.wildcards = (wildcards & ~OFPFW_NW_SRC_MASK)
-                             | (mask << OFPFW_NW_SRC_SHIFT);
-        }
-    }
-
-    protected static String ipToString(int ip) {
-        return Integer.toString(U8.f((byte) ((ip & 0xff000000) >> 24)))
-               + "." + Integer.toString((ip & 0x00ff0000) >> 16) + "."
-               + Integer.toString((ip & 0x0000ff00) >> 8) + "."
-               + Integer.toString(ip & 0x000000ff);
-    }
-}
+} 

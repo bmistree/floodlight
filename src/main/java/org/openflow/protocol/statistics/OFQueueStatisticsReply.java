@@ -1,49 +1,36 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol.statistics;
 
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 
 /**
  * Represents an ofp_queue_stats structure
  * @author David Erickson (daviderickson@cs.stanford.edu)
+ * @author Srini Seetharaman (srini.seetharaman@gmail.com)
  */
 public class OFQueueStatisticsReply implements OFStatistics {
-    protected short portNumber;
+    public static int MINIMUM_LENGTH = 40;
+
+    protected int portNumber;
     protected int queueId;
     protected long transmitBytes;
     protected long transmitPackets;
     protected long transmitErrors;
+    protected int durationSeconds;
+    protected int durationNanoseconds;    
 
     /**
      * @return the portNumber
      */
-    public short getPortNumber() {
+    public int getPortNumber() {
         return portNumber;
     }
 
     /**
      * @param portNumber the portNumber to set
      */
-    public void setPortNumber(short portNumber) {
+    public OFQueueStatisticsReply setPortNumber(int portNumber) {
         this.portNumber = portNumber;
+        return this;
     }
 
     /**
@@ -56,8 +43,9 @@ public class OFQueueStatisticsReply implements OFStatistics {
     /**
      * @param queueId the queueId to set
      */
-    public void setQueueId(int queueId) {
+    public OFQueueStatisticsReply setQueueId(int queueId) {
         this.queueId = queueId;
+        return this;
     }
 
     /**
@@ -70,8 +58,9 @@ public class OFQueueStatisticsReply implements OFStatistics {
     /**
      * @param transmitBytes the transmitBytes to set
      */
-    public void setTransmitBytes(long transmitBytes) {
+    public OFQueueStatisticsReply setTransmitBytes(long transmitBytes) {
         this.transmitBytes = transmitBytes;
+        return this;
     }
 
     /**
@@ -84,8 +73,9 @@ public class OFQueueStatisticsReply implements OFStatistics {
     /**
      * @param transmitPackets the transmitPackets to set
      */
-    public void setTransmitPackets(long transmitPackets) {
+    public OFQueueStatisticsReply setTransmitPackets(long transmitPackets) {
         this.transmitPackets = transmitPackets;
+        return this;
     }
 
     /**
@@ -98,34 +88,66 @@ public class OFQueueStatisticsReply implements OFStatistics {
     /**
      * @param transmitErrors the transmitErrors to set
      */
-    public void setTransmitErrors(long transmitErrors) {
+    public OFQueueStatisticsReply setTransmitErrors(long transmitErrors) {
         this.transmitErrors = transmitErrors;
+        return this;
     }
 
     @Override
-    @JsonIgnore
     public int getLength() {
-        return 32;
+        return MINIMUM_LENGTH;
+    }
+
+    /**
+     * @return the duration_seconds
+     */
+    public int getDurationSeconds() {
+        return durationSeconds;
+    }
+
+    /**
+     * @param durationSeconds the duration_seconds to set
+     */
+    public OFQueueStatisticsReply setDurationSeconds(int durationSeconds) {
+        this.durationSeconds = durationSeconds;
+        return this;
+    }
+
+    /**
+     * @return the duration_nanoseconds
+     */
+    public int getDurationNanoseconds() {
+        return durationNanoseconds;
+    }
+
+    /**
+     * @param durationNanoseconds the duration_nanoseconds to set
+     */
+    public OFQueueStatisticsReply setDurationNanoseconds(int durationNanoseconds) {
+        this.durationNanoseconds = durationNanoseconds;
+        return this;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
-        this.portNumber = data.readShort();
-        data.readShort(); // pad
-        this.queueId = data.readInt();
-        this.transmitBytes = data.readLong();
-        this.transmitPackets = data.readLong();
-        this.transmitErrors = data.readLong();
+    public void readFrom(ByteBuffer data) {
+        this.portNumber = data.getInt();
+        this.queueId = data.getInt();
+        this.transmitBytes = data.getLong();
+        this.transmitPackets = data.getLong();
+        this.transmitErrors = data.getLong();
+        this.durationSeconds = data.getInt();
+        this.durationNanoseconds = data.getInt();
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
-        data.writeShort(this.portNumber);
-        data.writeShort((short) 0); // pad
-        data.writeInt(this.queueId);
-        data.writeLong(this.transmitBytes);
-        data.writeLong(this.transmitPackets);
-        data.writeLong(this.transmitErrors);
+    public void writeTo(ByteBuffer data) {
+        data.putInt(this.portNumber);
+        data.putInt(this.queueId);
+        data.putLong(this.transmitBytes);
+        data.putLong(this.transmitPackets);
+        data.putLong(this.transmitErrors);
+        data.putInt(this.durationSeconds);
+        data.putInt(this.durationNanoseconds);        
     }
 
     @Override
@@ -140,6 +162,8 @@ public class OFQueueStatisticsReply implements OFStatistics {
                 + (int) (transmitErrors ^ (transmitErrors >>> 32));
         result = prime * result
                 + (int) (transmitPackets ^ (transmitPackets >>> 32));
+        result = prime * result + durationSeconds;
+        result = prime * result + durationNanoseconds;
         return result;
     }
 
@@ -170,6 +194,17 @@ public class OFQueueStatisticsReply implements OFStatistics {
         if (transmitPackets != other.transmitPackets) {
             return false;
         }
+        if (durationSeconds != other.durationSeconds) {
+            return false;
+        }
+        if (durationNanoseconds != other.durationNanoseconds) {
+            return false;
+        }
         return true;
+    }
+
+    @Override
+    public int computeLength() {
+        return getLength();
     }
 }

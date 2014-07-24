@@ -30,8 +30,8 @@ public interface ITopologyService extends IFloodlightService  {
     /**
      * Query to determine if devices must be learned on a given switch port.
      */
-    public boolean isAttachmentPointPort(long switchid, short port);
-    public boolean isAttachmentPointPort(long switchid, short port,
+    public boolean isAttachmentPointPort(long switchid, int port);
+    public boolean isAttachmentPointPort(long switchid, int port,
                                          boolean tunnelEnabled);
 
     public long getOpenflowDomainId(long switchId);
@@ -71,22 +71,22 @@ public interface ITopologyService extends IFloodlightService  {
     public boolean inSameL2Domain(long switch1, long switch2,
                                   boolean tunnelEnabled);
 
-    public boolean isBroadcastDomainPort(long sw, short port);
-    public boolean isBroadcastDomainPort(long sw, short port,
+    public boolean isBroadcastDomainPort(long sw, int port);
+    public boolean isBroadcastDomainPort(long sw, int port,
                                          boolean tunnelEnabled);
 
 
-    public boolean isAllowed(long sw, short portId);
-    public boolean isAllowed(long sw, short portId, boolean tunnelEnabled);
+    public boolean isAllowed(long sw, int portId);
+    public boolean isAllowed(long sw, int portId, boolean tunnelEnabled);
 
     /**
      * Indicates if an attachment point on the new switch port is consistent
      * with the attachment point on the old switch port or not.
      */
-    public boolean isConsistent(long oldSw, short oldPort,
-                                long newSw, short newPort);
-    public boolean isConsistent(long oldSw, short oldPort,
-                                long newSw, short newPort,
+    public boolean isConsistent(long oldSw, int oldPort,
+                                long newSw, int newPort);
+    public boolean isConsistent(long oldSw, int oldPort,
+                                long newSw, int newPort,
                                 boolean tunnelEnabled);
 
     /**
@@ -98,10 +98,10 @@ public interface ITopologyService extends IFloodlightService  {
      * @param p2
      * @return
      */
-    public boolean isInSameBroadcastDomain(long s1, short p1,
-                                           long s2, short p2);
-    public boolean isInSameBroadcastDomain(long s1, short p1,
-                                           long s2, short p2,
+    public boolean isInSameBroadcastDomain(long s1, int p1,
+                                           long s2, int p2);
+    public boolean isInSameBroadcastDomain(long s1, int p1,
+                                           long s2, int p2,
                                            boolean tunnelEnabled);
 
     /**
@@ -109,41 +109,41 @@ public interface ITopologyService extends IFloodlightService  {
      * @param sw The switch DPID in long
      * @return The set of ports on this switch
      */
-    public Set<Short> getPortsWithLinks(long sw);
-    public Set<Short> getPortsWithLinks(long sw, boolean tunnelEnabled);
+    public Set<Integer> getPortsWithLinks(long sw);
+    public Set<Integer> getPortsWithLinks(long sw, boolean tunnelEnabled);
 
     /** Get broadcast ports on a target switch for a given attachmentpoint
      * point port.
      */
-    public Set<Short> getBroadcastPorts(long targetSw, long src, short srcPort);
+    public Set<Integer> getBroadcastPorts(long targetSw, long src, int srcPort);
 
-    public Set<Short> getBroadcastPorts(long targetSw, long src, short srcPort,
+    public Set<Integer> getBroadcastPorts(long targetSw, long src, int srcPort,
                                         boolean tunnelEnabled);
 
     /**
      *
      */
-    public boolean isIncomingBroadcastAllowed(long sw, short portId);
-    public boolean isIncomingBroadcastAllowed(long sw, short portId,
+    public boolean isIncomingBroadcastAllowed(long sw, int portId);
+    public boolean isIncomingBroadcastAllowed(long sw, int portId,
                                               boolean tunnelEnabled);
 
 
     /** Get the proper outgoing switchport for a given pair of src-dst
      * switchports.
      */
-    public NodePortTuple getOutgoingSwitchPort(long src, short srcPort,
-                                               long dst, short dstPort);
+    public NodePortTuple getOutgoingSwitchPort(long src, int srcPort,
+                                               long dst, int dstPort);
 
 
-    public NodePortTuple getOutgoingSwitchPort(long src, short srcPort,
-                                               long dst, short dstPort,
+    public NodePortTuple getOutgoingSwitchPort(long src, int srcPort,
+                                               long dst, int dstPort,
                                                boolean tunnelEnabled);
 
 
-    public NodePortTuple getIncomingSwitchPort(long src, short srcPort,
-                                               long dst, short dstPort);
-    public NodePortTuple getIncomingSwitchPort(long src, short srcPort,
-                                               long dst, short dstPort,
+    public NodePortTuple getIncomingSwitchPort(long src, int srcPort,
+                                               long dst, int dstPort);
+    public NodePortTuple getIncomingSwitchPort(long src, int srcPort,
+                                               long dst, int dstPort,
                                                boolean tunnelEnabled);
 
     /**
@@ -155,15 +155,15 @@ public interface ITopologyService extends IFloodlightService  {
      */
     public NodePortTuple
     getAllowedOutgoingBroadcastPort(long src,
-                                    short srcPort,
+                                    int srcPort,
                                     long dst,
-                                    short dstPort);
+                                    int dstPort);
 
     public NodePortTuple
     getAllowedOutgoingBroadcastPort(long src,
-                                    short srcPort,
+                                    int srcPort,
                                     long dst,
-                                    short dstPort,
+                                    int dstPort,
                                     boolean tunnelEnabled);
 
     /**
@@ -177,11 +177,11 @@ public interface ITopologyService extends IFloodlightService  {
      */
     public NodePortTuple
     getAllowedIncomingBroadcastPort(long src,
-                                    short srcPort);
+                                    int srcPort);
 
     public NodePortTuple
     getAllowedIncomingBroadcastPort(long src,
-                                    short srcPort,
+                                    int srcPort,
                                     boolean tunnelEnabled);
 
 
@@ -206,5 +206,5 @@ public interface ITopologyService extends IFloodlightService  {
      * an empty set if switch doesn't exists, doesn't have any enabled port, or
      * has only quarantined ports. Will never return null.
      */
-    public Set<Short> getPorts(long sw);
+    public Set<Integer> getPorts(long sw);
 }

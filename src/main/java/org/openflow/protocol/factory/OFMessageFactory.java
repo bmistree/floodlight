@@ -1,25 +1,8 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol.factory;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFType;
 
@@ -38,18 +21,27 @@ public interface OFMessageFactory {
     public OFMessage getMessage(OFType t);
 
     /**
-     * Attempts to parse and return a OFMessages contained in the given
-     * ChannelBuffer, beginning at the ChannelBuffer's position, and ending at the
-     * after the first parsed message
-     * @param data the ChannelBuffer to parse for an OpenFlow message
+     * Attempts to parse and return all OFMessages contained in the given
+     * ByteBuffer, beginning at the ByteBuffer's position, and ending at the
+     * ByteBuffer's limit.
+     * @param data the ByteBuffer to parse for an OpenFlow message
      * @return a list of OFMessage instances
-     * @throws MessageParseException 
      */
-    public List<OFMessage> parseMessage(ChannelBuffer data) throws MessageParseException;
+    public List<OFMessage> parseMessages(ByteBuffer data);
 
     /**
-     * Retrieves an OFActionFactory
-     * @return an OFActionFactory
+     * Attempts to parse and return all OFMessages contained in the given
+     * ByteBuffer, beginning at the ByteBuffer's position, and ending at the
+     * ByteBuffer's limit.
+     * @param data the ByteBuffer to parse for an OpenFlow message
+     * @param limit the maximum number of messages to return, 0 means no limit
+     * @return a list of OFMessage instances
      */
-    public OFActionFactory getActionFactory();
+    public List<OFMessage> parseMessages(ByteBuffer data, int limit);
+
+    /**
+     * Retrieves an OFInstructionFactory
+     * @return an OFInstructionFactory
+     */
+    public OFInstructionFactory getInstructionFactory();
 }

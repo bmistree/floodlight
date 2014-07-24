@@ -104,7 +104,7 @@ public class Device implements IDevice {
         if (entity.getSwitchDPID() != null &&
                 entity.getSwitchPort() != null){
             long sw = entity.getSwitchDPID();
-            short port = entity.getSwitchPort().shortValue();
+            int port = entity.getSwitchPort().shortValue();
 
             if (deviceManager.isValidAttachmentPoint(sw, port)) {
                 AttachmentPoint ap;
@@ -385,7 +385,7 @@ public class Device implements IDevice {
      * @param lastSeen
      * @return
      */
-    protected boolean updateAttachmentPoint(long sw, short port, long lastSeen){
+    protected boolean updateAttachmentPoint(long sw, int port, long lastSeen){
         ITopologyService topology = deviceManager.topology;
         List<AttachmentPoint> oldAPList;
         List<AttachmentPoint> apList;
@@ -480,7 +480,7 @@ public class Device implements IDevice {
      * @param port
      * @return
      */
-    public boolean deleteAttachmentPoint(long sw, short port) {
+    public boolean deleteAttachmentPoint(long sw, int port) {
         AttachmentPoint ap = new AttachmentPoint(sw, port, 0);
 
         if (this.oldAPs != null) {

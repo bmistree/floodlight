@@ -1,6 +1,6 @@
 package com.bigswitch.floodlight.vendor;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 
 public class OFBsnL2TableVendorData extends OFBigSwitchVendorData {
     /*
@@ -55,27 +55,27 @@ public class OFBsnL2TableVendorData extends OFBigSwitchVendorData {
     
     /*
      * (non-Javadoc)
-     * @see com.bigswitch.floodlight.vendor.OFBigSwitchVendorData#readFrom(org.jboss.netty.buffer.ChannelBuffer, int)
+     * @see com.bigswitch.floodlight.vendor.OFBigSwitchVendorData#readFrom(java.nio.ByteBuffer, int)
      */
     @Override 
-    public void readFrom(ChannelBuffer data, int length) {
+    public void readFrom(ByteBuffer data, int length) {
         super.readFrom(data, length);
-        l2TableEnabled = (data.readByte() == 0) ? false : true;
-        data.readByte();  // pad
-        l2TablePriority = data.readShort();
-        data.readInt();   // 4 bad bytes
+        l2TableEnabled = (data.get() == 0) ? false : true;
+        data.get();  // pad
+        l2TablePriority = data.getShort();
+        data.getInt();   // 4 bad bytes
     }
     
     /*
      * (non-Javadoc)
-     * @see com.bigswitch.floodlight.vendor.OFBigSwitchVendorData#writeTo(org.jboss.netty.buffer.ChannelBuffer)
+     * @see com.bigswitch.floodlight.vendor.OFBigSwitchVendorData#writeTo(java.nio.ByteBuffer)
      */
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeByte(isL2TableEnabled() ? 1 : 0);
-        data.writeByte(0);  // pad
-        data.writeShort(l2TablePriority);
-        data.writeInt(0);   // 4 pad bytes
+        data.put((byte)(isL2TableEnabled() ? 1 : 0));
+        data.put((byte)0);  // pad
+        data.putShort(l2TablePriority);
+        data.putInt(0);   // 4 pad bytes
     }
 }

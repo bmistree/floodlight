@@ -1,31 +1,14 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-*
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.factory.OFActionFactory;
 import org.openflow.protocol.factory.OFActionFactoryAware;
-import org.openflow.util.HexString;
 import org.openflow.util.U16;
+import org.openflow.util.HexString;
 
 /**
  * Represents an ofp_packet_out message
@@ -33,12 +16,12 @@ import org.openflow.util.U16;
  * @author David Erickson (daviderickson@cs.stanford.edu) - Mar 12, 2010
  */
 public class OFPacketOut extends OFMessage implements OFActionFactoryAware {
-    public static int MINIMUM_LENGTH = 16;
+    public static int MINIMUM_LENGTH = 24;
     public static int BUFFER_ID_NONE = 0xffffffff;
 
     protected OFActionFactory actionFactory;
     protected int bufferId;
-    protected short inPort;
+    protected int inPort;
     protected short actionsLength;
     protected List<OFAction> actions;
     protected byte[] packetData;
@@ -47,8 +30,24 @@ public class OFPacketOut extends OFMessage implements OFActionFactoryAware {
         super();
         this.type = OFType.PACKET_OUT;
         this.length = U16.t(MINIMUM_LENGTH);
-        this.bufferId = BUFFER_ID_NONE;
     }
+
+    /**
+     * Creates a OFPacketOut object with the packet's data, actions, and
+     * bufferId
+     * @param packetData the packet data
+     * @param actions actions to apply to the packet
+     * @param bufferId the buffer id
+     */
+    public OFPacketOut(byte[] packetData, List<OFAction> actions, int bufferId) {
+        super();
+        this.type = OFType.PACKET_OUT;
+        this.length = U16.t(MINIMUM_LENGTH);
+        this.packetData = packetData;
+        this.actions = actions;
+        this.bufferId = bufferId;
+    }
+
 
     /**
      * Get buffer_id
@@ -96,16 +95,16 @@ public class OFPacketOut extends OFMessage implements OFActionFactoryAware {
      * Get in_port
      * @return
      */
-    public short getInPort() {
+    public int getInPort() {
         return this.inPort;
     }
 
     /**
      * Set in_port
-     * @param inPort
+     * @param i
      */
-    public OFPacketOut setInPort(short inPort) {
-        this.inPort = inPort;
+    public OFPacketOut setInPort(int i) {
+        this.inPort = i;
         return this;
     }
 
@@ -157,6 +156,12 @@ public class OFPacketOut extends OFMessage implements OFActionFactoryAware {
      */
     public OFPacketOut setActions(List<OFAction> actions) {
         this.actions = actions;
+        if (actions != null) {
+            int l = 0;
+            for (OFAction action: actions)
+                l += action.getLength();
+            this.actionsLength = U16.t(l);
+        }
         return this;
     }
 
@@ -166,39 +171,32 @@ public class OFPacketOut extends OFMessage implements OFActionFactoryAware {
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        this.bufferId = data.readInt();
-        this.inPort = data.readShort();
-        this.actionsLength = data.readShort();
+        this.bufferId = data.getInt();
+        this.inPort = data.getInt();
+        this.actionsLength = data.getShort();
+        data.position(data.position()+6);
         if ( this.actionFactory == null)
             throw new RuntimeException("ActionFactory not set");
         this.actions = this.actionFactory.parseActions(data, getActionsLengthU());
         this.packetData = new byte[getLengthU() - MINIMUM_LENGTH - getActionsLengthU()];
-        data.readBytes(this.packetData);
-        validate();
+        data.get(this.packetData);
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
-        validate();
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeInt(bufferId);
-        data.writeShort(inPort);
-        data.writeShort(actionsLength);
+        data.putInt(bufferId);
+        data.putInt(inPort);
+        data.putShort(actionsLength);
+        for (int i=0;i<6;i++)
+            data.put((byte)0); //pad
         for (OFAction action : actions) {
             action.writeTo(data);
         }
         if (this.packetData != null)
-            data.writeBytes(this.packetData);
-    }
-
-    /** validate the invariants of this OFMessage hold */
-    public void validate() {
-        if (!((bufferId != BUFFER_ID_NONE) ^ (packetData != null && packetData.length > 0))) {
-            throw new IllegalStateException(
-                    "OFPacketOut must have exactly one of (bufferId, packetData) set (not one, not both)");
-        }
+            data.put(this.packetData);
     }
 
     @Override
@@ -256,5 +254,21 @@ public class OFPacketOut extends OFMessage implements OFActionFactoryAware {
                 + actions + ", actionsLength=" + actionsLength + ", bufferId=0x"
                 + Integer.toHexString(bufferId) + ", inPort=" + inPort + ", packetData="
                 + HexString.toHexString(packetData) + "]";
+    }
+
+    /* (non-Javadoc)
+     * @see org.openflow.protocol.OFMessage#computeLength()
+     */
+    @Override
+    public void computeLength() {
+        int l = MINIMUM_LENGTH + ((packetData != null) ? packetData.length : 0);
+        int al = 0;
+        if (actions != null) {
+            for (OFAction action : actions) {
+                al += action.getLengthU();
+            }
+        }
+        this.length = U16.t(l+al);
+        this.actionsLength = U16.t(al);
     }
 }

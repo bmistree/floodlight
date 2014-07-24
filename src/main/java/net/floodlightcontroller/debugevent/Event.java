@@ -117,8 +117,14 @@ public class Event {
                             if ((flags & OFFlowMod.OFPFF_CHECK_OVERLAP) != 0) {
                                 builder.append("CHECK_OVERLAP ");
                             }
-                            if ((flags & OFFlowMod.OFPFF_EMERG) != 0) {
-                                builder.append("EMERG ");
+                            if ((flags & OFFlowMod.OFPFF_NO_BYT_COUNTS) != 0) {
+                                builder.append("NO_BYT_COUNTS ");
+                            }
+                            if ((flags & OFFlowMod.OFPFF_NO_PKT_COUNTS) != 0) {
+                                builder.append("NO_PKT_COUNTS ");
+                            }
+                            if ((flags & OFFlowMod.OFPFF_RESET_COUNTS) != 0) {
+                                builder.append("RESET_COUNTS ");
                             }
                         }
                         retMap.put(ec.name(), builder.toString());

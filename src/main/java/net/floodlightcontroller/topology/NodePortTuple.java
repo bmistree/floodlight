@@ -32,18 +32,13 @@ import org.openflow.util.HexString;
 
 public class NodePortTuple implements Comparable<NodePortTuple> {
     protected long nodeId; // switch DPID
-    protected short portId; // switch port id
+    protected int portId; // switch port id
 
     /**
      * Creates a NodePortTuple
      * @param nodeId The DPID of the switch
      * @param portId The port of the switch
      */
-    public NodePortTuple(long nodeId, short portId) {
-        this.nodeId = nodeId;
-        this.portId = portId;
-    }
-
     public NodePortTuple(long nodeId, int portId) {
         this.nodeId = nodeId;
         this.portId = (short) portId;
@@ -59,15 +54,15 @@ public class NodePortTuple implements Comparable<NodePortTuple> {
     }
     @JsonProperty("port")
     @JsonSerialize(using=UShortSerializer.class)
-    public short getPortId() {
+    public int getPortId() {
         return portId;
     }
-    public void setPortId(short portId) {
+    public void setPortId(int portId) {
         this.portId = portId;
     }
     
     public String toString() {
-        return "[id=" + HexString.toHexString(nodeId) + ", port=" + new Short(portId) + "]";
+        return "[id=" + HexString.toHexString(nodeId) + ", port=" + portId + "]";
     }
 
     @Override

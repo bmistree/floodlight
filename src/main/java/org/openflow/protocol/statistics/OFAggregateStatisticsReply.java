@@ -1,31 +1,14 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol.statistics;
 
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 
 /**
  * Represents an ofp_aggregate_stats_reply structure
  * @author David Erickson (daviderickson@cs.stanford.edu)
  */
 public class OFAggregateStatisticsReply implements OFStatistics {
+    protected static int MINIMUM_LENGTH = 24;
+
     protected long packetCount;
     protected long byteCount;
     protected int flowCount;
@@ -40,8 +23,9 @@ public class OFAggregateStatisticsReply implements OFStatistics {
     /**
      * @param packetCount the packetCount to set
      */
-    public void setPacketCount(long packetCount) {
+    public OFAggregateStatisticsReply setPacketCount(long packetCount) {
         this.packetCount = packetCount;
+        return this;
     }
 
     /**
@@ -54,8 +38,9 @@ public class OFAggregateStatisticsReply implements OFStatistics {
     /**
      * @param byteCount the byteCount to set
      */
-    public void setByteCount(long byteCount) {
+    public OFAggregateStatisticsReply setByteCount(long byteCount) {
         this.byteCount = byteCount;
+        return this;
     }
 
     /**
@@ -68,30 +53,30 @@ public class OFAggregateStatisticsReply implements OFStatistics {
     /**
      * @param flowCount the flowCount to set
      */
-    public void setFlowCount(int flowCount) {
+    public OFAggregateStatisticsReply setFlowCount(int flowCount) {
         this.flowCount = flowCount;
+        return this;
     }
 
     @Override
-    @JsonIgnore
     public int getLength() {
-        return 24;
+        return MINIMUM_LENGTH;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
-        this.packetCount = data.readLong();
-        this.byteCount = data.readLong();
-        this.flowCount = data.readInt();
-        data.readInt(); // pad
+    public void readFrom(ByteBuffer data) {
+        this.packetCount = data.getLong();
+        this.byteCount = data.getLong();
+        this.flowCount = data.getInt();
+        data.getInt(); // pad
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
-        data.writeLong(this.packetCount);
-        data.writeLong(this.byteCount);
-        data.writeInt(this.flowCount);
-        data.writeInt(0); // pad
+    public void writeTo(ByteBuffer data) {
+        data.putLong(this.packetCount);
+        data.putLong(this.byteCount);
+        data.putInt(this.flowCount);
+        data.putInt(0); // pad
     }
 
     @Override
@@ -126,5 +111,10 @@ public class OFAggregateStatisticsReply implements OFStatistics {
             return false;
         }
         return true;
+    }
+
+    @Override
+    public int computeLength() {
+        return getLength();
     }
 }

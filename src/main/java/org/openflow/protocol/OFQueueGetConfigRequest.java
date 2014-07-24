@@ -1,75 +1,59 @@
-/**
-*    Copyright 2012, Andrew Ferguson, Brown University
-*
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
+
 import org.openflow.util.U16;
 
 /**
- * Represents an ofp_queue_get_config_request message
- * @author Andrew Ferguson (adf@cs.brown.edu)
+ *
+ * @author David Erickson (daviderickson@cs.stanford.edu)
  */
-public class OFQueueGetConfigRequest extends OFMessage {
-    public static int MINIMUM_LENGTH = 12;
+public class OFQueueGetConfigRequest extends OFMessage implements Cloneable {
+    public static int MINIMUM_LENGTH = 16;
 
-    protected short portNumber;
+    protected int portNumber;
 
-    public OFQueueGetConfigRequest(short portNumber) {
+    /**
+     * 
+     */
+    public OFQueueGetConfigRequest() {
         super();
         this.type = OFType.QUEUE_GET_CONFIG_REQUEST;
         this.length = U16.t(MINIMUM_LENGTH);
-        this.portNumber = portNumber;
-    }
-
-    public OFQueueGetConfigRequest() {
-        this((short) 0);
     }
 
     /**
      * @return the portNumber
      */
-    public short getPortNumber() {
+    public int getPortNumber() {
         return portNumber;
     }
 
     /**
-     * @param portNumber the portNumber to set
+     * @param portNumber the port to set
      */
-    public void setPortNumber(short portNumber) {
+    public OFQueueGetConfigRequest setPortNumber(int portNumber) {
         this.portNumber = portNumber;
+        return this;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        this.portNumber = data.readShort();
-        data.readShort(); // pad
+        this.portNumber = data.getInt();
+        data.getInt(); // pad
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeShort(this.portNumber);
-        data.writeShort(0); // pad
+        data.putInt(this.portNumber);
+        data.putInt(0); // pad
     }
 
     @Override
     public int hashCode() {
-        final int prime = 347;
+        final int prime = 7211;
         int result = super.hashCode();
         result = prime * result + portNumber;
         return result;
@@ -77,19 +61,32 @@ public class OFQueueGetConfigRequest extends OFMessage {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) {
+        if (this == obj)
             return true;
-        }
-        if (!super.equals(obj)) {
+        if (!super.equals(obj))
             return false;
-        }
-        if (!(obj instanceof OFQueueGetConfigRequest)) {
+        if (!(obj instanceof OFQueueGetConfigRequest))
             return false;
-        }
         OFQueueGetConfigRequest other = (OFQueueGetConfigRequest) obj;
-        if (portNumber != other.portNumber) {
+        if (portNumber != other.portNumber)
             return false;
-        }
         return true;
+    }
+
+    @Override
+    public OFQueueGetConfigRequest clone() {
+        try {
+            return (OFQueueGetConfigRequest) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /* (non-Javadoc)
+     * @see org.openflow.protocol.OFMessage#computeLength()
+     */
+    @Override
+    public void computeLength() {
+        this.length = (short) MINIMUM_LENGTH;
     }
 }

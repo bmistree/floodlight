@@ -1,6 +1,6 @@
 package com.bigswitch.floodlight.vendor;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 
 
 /**
@@ -63,25 +63,25 @@ public class OFNetmaskVendorData extends OFBigSwitchVendorData {
      * @param data: the channel buffer from which we are deserializing
      * @param length: the length to the end of the enclosing message
      */
-    public void readFrom(ChannelBuffer data, int length) {
+    public void readFrom(ByteBuffer data, int length) {
         super.readFrom(data, length);
-        tableIndex = data.readByte();
-        pad1 = data.readByte();
-        pad2 = data.readByte();
-        pad3 = data.readByte();
-        netMask = data.readInt();
+        tableIndex = data.get();
+        pad1 = data.get();
+        pad2 = data.get();
+        pad3 = data.get();
+        netMask = data.getInt();
     }
     
     /**
      * Write the vendor data to the channel buffer
      */
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeByte(tableIndex);
-        data.writeByte(pad1);
-        data.writeByte(pad2);
-        data.writeByte(pad3);
-        data.writeInt(netMask);
+        data.put(tableIndex);
+        data.put(pad1);
+        data.put(pad2);
+        data.put(pad3);
+        data.putInt(netMask);
     }
     
 

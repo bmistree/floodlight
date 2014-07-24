@@ -49,8 +49,8 @@ public class ExternalLinksResource extends ServerResource {
 
                     long src = link.getSrc();
                     long dst = link.getDst();
-                    short srcPort = link.getSrcPort();
-                    short dstPort = link.getDstPort();
+                    int srcPort = link.getSrcPort();
+                    int dstPort = link.getDstPort();
                     Link otherLink = new Link(dst, dstPort, src, srcPort);
                     LinkInfo otherInfo = links.get(otherLink);
                     LinkType otherType = null;

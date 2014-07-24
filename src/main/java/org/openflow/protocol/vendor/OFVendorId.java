@@ -20,7 +20,7 @@ package org.openflow.protocol.vendor;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 
 /**
  * Base class for the vendor ID corresponding to vendor extensions from a
@@ -81,5 +81,5 @@ public abstract class OFVendorId {
      * @return the OFVendorDataType that can be used to instantiate the
      *         appropriate subclass of OFVendorData.
      */
-    public abstract OFVendorDataType parseVendorDataType(ChannelBuffer data, int length);
+    public abstract OFVendorDataType parseVendorDataType(ByteBuffer data, int length);
 }

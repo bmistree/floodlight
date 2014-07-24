@@ -53,8 +53,8 @@ public interface IRoutingService extends IFloodlightService {
      * @param dstPort dstPort on Destination switch.
      * @param cookie cookie (usage determined by implementation; ignored by topology instance now).
      */
-    public Route getRoute(long srcId, short srcPort,
-                             long dstId, short dstPort, long cookie);
+    public Route getRoute(long srcId, int srcPort,
+                             long dstId, int dstPort, long cookie);
 
     /**
      * Provides a route between srcPort on src and dstPort on dst.
@@ -65,8 +65,8 @@ public interface IRoutingService extends IFloodlightService {
      * @param cookie cookie (usage determined by implementation; ignored by topology instance now).
      * @param tunnelEnabled boolean option.
      */
-    public Route getRoute(long srcId, short srcPort,
-                             long dstId, short dstPort, long cookie,
+    public Route getRoute(long srcId, int srcPort,
+                             long dstId, int dstPort, long cookie,
                              boolean tunnelEnabled);
 
     /** return all routes, if available */

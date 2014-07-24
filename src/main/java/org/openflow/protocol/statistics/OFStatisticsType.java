@@ -1,20 +1,3 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol.statistics;
 
 import java.lang.reflect.Constructor;
@@ -23,13 +6,8 @@ import org.openflow.protocol.Instantiable;
 import org.openflow.protocol.OFType;
 
 public enum OFStatisticsType {
-    DESC        (0, OFDescriptionStatistics.class, OFDescriptionStatistics.class,
-                    new Instantiable<OFStatistics>() {
-                        @Override
-                        public OFStatistics instantiate() {
-                            return new OFDescriptionStatistics();
-                        }
-                    },
+    DESC        (0, null, OFDescriptionStatistics.class,
+                    null,
                     new Instantiable<OFStatistics>() {
                         @Override
                         public OFStatistics instantiate() {
@@ -101,6 +79,109 @@ public enum OFStatisticsType {
                             return new OFQueueStatisticsReply();
                         }
                     }),
+/* TODO
+    GROUP       (6, OFGroupStatisticsRequest.class, OFGroupStatisticsReply.class,
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFGroupStatisticsRequest();
+                        }
+                    },
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFGroupStatisticsReply();
+                        }
+                    }),
+
+    GROUP_DESC   (7, OFGroupDescriptionStatisticsRequest.class, OFGroupDescriptionStatisticsReply.class,
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFGroupDescriptionStatisticsRequest();
+                        }
+                    },
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFGroupDescriptionStatisticsReply();
+                        }
+                    }),
+    GROUP_FEATURES (8, OFGroupFeaturesStatisticsRequest.class, OFGroupFeaturesStatisticsReply.class,
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFGroupFeaturesStatisticsRequest();
+                        }
+                    },
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFGroupFeaturesStatisticsReply();
+                        }
+                    }),
+    METER         (9, OFMeterStatisticsRequest.class, OFMeterStatisticsReply.class,
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFMeterStatisticsRequest();
+                        }
+                    },
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFMeterStatisticsReply();
+                        }
+                    }),
+
+    METER_CONFIG   (10, OFMeterConfigStatisticsRequest.class, OFMeterConfigStatisticsReply.class,
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFMeterConfigStatisticsRequest();
+                        }
+                    },
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFMeterConfigStatisticsReply();
+                        }
+                    }),
+    METER_FEATURES (11, OFMeterFeaturesStatisticsRequest.class, OFMeterFeaturesStatisticsReply.class,
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFMeterFeaturesStatisticsRequest();
+                        }
+                    },
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFMeterFeaturesStatisticsReply();
+                        }
+                    }),
+ */
+    TABLE_FEATURES (12, OFTableFeatures.class, OFTableFeatures.class,
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFTableFeatures();
+                        }
+                    },
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFTableFeatures();
+                        }
+                    }),
+    PORT_DESC (13, null, OFPortDescription.class,
+                    null,
+                    new Instantiable<OFStatistics>() {
+                        @Override
+                        public OFStatistics instantiate() {
+                            return new OFPortDescription();
+                        }
+                    }),
     VENDOR     (0xffff, OFVendorStatistics.class, OFVendorStatistics.class,
                     new Instantiable<OFStatistics>() {
                         @Override
@@ -142,13 +223,15 @@ public enum OFStatisticsType {
             Instantiable<OFStatistics> replyInstantiable) {
         this.type = (short) type;
         this.requestClass = requestClass;
-        try {
-            this.requestConstructor = requestClass.getConstructor(new Class[]{});
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "Failure getting constructor for class: " + requestClass, e);
+        if (requestClass != null) {
+            try {
+                this.requestConstructor = requestClass.getConstructor(new Class[]{});
+            } catch (Exception e) {
+                throw new RuntimeException(
+                        "Failure getting constructor for class: " + requestClass, e);
+            }
         }
-
+        
         this.replyClass = replyClass;
         try {
             this.replyConstructor = replyClass.getConstructor(new Class[]{});
@@ -156,9 +239,13 @@ public enum OFStatisticsType {
             throw new RuntimeException(
                     "Failure getting constructor for class: " + replyClass, e);
         }
-        this.requestInstantiable = requestInstantiable;
+        
+        if (requestClass !=null) {
+            this.requestInstantiable = requestInstantiable;
+            OFStatisticsType.addMapping(this.type, OFType.STATS_REQUEST, this);
+        }
+        
         this.replyInstantiable = replyInstantiable;
-        OFStatisticsType.addMapping(this.type, OFType.STATS_REQUEST, this);
         OFStatisticsType.addMapping(this.type, OFType.STATS_REPLY, this);
     }
 

@@ -17,7 +17,7 @@
 
 package org.openflow.protocol.factory;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 import org.openflow.protocol.vendor.OFVendorData;
 import org.openflow.protocol.vendor.OFVendorDataType;
 import org.openflow.protocol.vendor.OFVendorId;
@@ -58,12 +58,12 @@ public interface OFVendorDataFactory {
     
     /**
      * Attempts to parse and return the OFVendorData contained in the given
-     * ChannelBuffer, beginning right after the vendor id.
+     * ByteBuffer, beginning right after the vendor id.
      * @param vendorId the vendor id that was parsed from the OFVendor message.
-     * @param data the ChannelBuffer from which to parse the vendor data
+     * @param data the ByteBuffer from which to parse the vendor data
      * @param length the length to the end of the enclosing message.
      * @return an OFVendorData instance
      */
-    public OFVendorData parseVendorData(int vendorId, ChannelBuffer data,
+    public OFVendorData parseVendorData(int vendorId, ByteBuffer data,
             int length);
 }

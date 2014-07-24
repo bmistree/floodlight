@@ -1,51 +1,31 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
-
+import java.nio.ByteBuffer;
 import java.util.Arrays;
-
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.util.U16;
 
 /**
  * Represents an ofp_echo_request message
  * 
  * @author Rob Sherwood (rob.sherwood@stanford.edu)
+ * @author Srini Seetharaman (srini.seetharaman@gmail.com)
  */
 
 public class OFEchoRequest extends OFMessage {
-    public static int MINIMUM_LENGTH = 8;
     byte[] payload;
 
     public OFEchoRequest() {
         super();
         this.type = OFType.ECHO_REQUEST;
-        this.length = U16.t(MINIMUM_LENGTH);
     }
 
     @Override
-    public void readFrom(ChannelBuffer bb) {
+    public void readFrom(ByteBuffer bb) {
         super.readFrom(bb);
-        int datalen = this.getLengthU() - MINIMUM_LENGTH;
+        int datalen = this.getLengthU() - OFMessage.MINIMUM_LENGTH;
         if (datalen > 0) {
             this.payload = new byte[datalen];
-            bb.readBytes(payload);
+            bb.get(payload);
         }
     }
 
@@ -60,15 +40,16 @@ public class OFEchoRequest extends OFMessage {
      * @param payload
      *            the payload to set
      */
-    public void setPayload(byte[] payload) {
+    public OFEchoRequest setPayload(byte[] payload) {
         this.payload = payload;
+        return this;
     }
 
     @Override
-    public void writeTo(ChannelBuffer bb) {
+    public void writeTo(ByteBuffer bb) {
         super.writeTo(bb);
         if (payload != null)
-            bb.writeBytes(payload);
+            bb.put(payload);
     }
 
     /* (non-Javadoc)
@@ -97,5 +78,13 @@ public class OFEchoRequest extends OFMessage {
         if (!Arrays.equals(payload, other.payload))
             return false;
         return true;
+    }
+
+    /* (non-Javadoc)
+     * @see org.openflow.protocol.OFMessage#computeLength()
+     */
+    @Override
+    public void computeLength() {
+        this.length = U16.t(OFMessage.MINIMUM_LENGTH + ((payload != null) ? payload.length : 0));
     }
 }

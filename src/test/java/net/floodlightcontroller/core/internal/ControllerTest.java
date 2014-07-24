@@ -84,7 +84,7 @@ import org.openflow.protocol.OFPort;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
-import org.openflow.protocol.factory.BasicFactory;
+import org.openflow.protocol.factory.FloodlightFactory;
 import org.openflow.protocol.statistics.OFDescriptionStatistics;
 import org.openflow.util.HexString;
 import org.sdnplatform.sync.IStoreClient;
@@ -186,9 +186,9 @@ public class ControllerTest extends FloodlightTestCase {
                 .setTargetProtocolAddress(IPv4.toIPv4AddressBytes("192.168.1.2")));
         byte[] testPacketSerialized = testPacket.serialize();
 
-        pi = ((OFPacketIn) BasicFactory.getInstance().getMessage(OFType.PACKET_IN))
+        pi = ((OFPacketIn) FloodlightFactory.getInstance().getMessage(OFType.PACKET_IN))
                 .setBufferId(-1)
-                .setInPort((short) 1)
+                .setMatch(new OFMatch().setInPort(1))
                 .setPacketData(testPacketSerialized)
                 .setReason(OFPacketInReason.NO_MATCH)
                 .setTotalLength((short) testPacketSerialized.length);
@@ -391,7 +391,7 @@ public class ControllerTest extends FloodlightTestCase {
         verify(test3);
 
         OFFlowMod fm = (OFFlowMod)
-                BasicFactory.getInstance().getMessage(OFType.FLOW_MOD);
+                FloodlightFactory.getInstance().getMessage(OFType.FLOW_MOD);
 
         //------------------
         // Test FlowMod handling: all listeners return CONTINUE
@@ -627,7 +627,7 @@ public class ControllerTest extends FloodlightTestCase {
      */
     @Test
     public void testHandleOutgoingMessage() throws Exception {
-        OFMessage m = BasicFactory.getInstance().getMessage(OFType.ECHO_REQUEST);
+        OFMessage m = FloodlightFactory.getInstance().getMessage(OFType.ECHO_REQUEST);
         FloodlightContext cntx = new FloodlightContext();
         IOFSwitch sw = createMock(IOFSwitch.class);
         expect(sw.getId()).andReturn(0L).anyTimes();
@@ -715,7 +715,7 @@ public class ControllerTest extends FloodlightTestCase {
         // Test for message without listeners
         reset(test1, test2, test3, sw);
         replay(test1, test2, test3, sw);
-        m = BasicFactory.getInstance().getMessage(OFType.ECHO_REPLY);
+        m = FloodlightFactory.getInstance().getMessage(OFType.ECHO_REPLY);
         controller.handleOutgoingMessage(sw, m, cntx);
         verify(test1);
         verify(test2);
@@ -789,9 +789,9 @@ public class ControllerTest extends FloodlightTestCase {
         byte[] testPacketSerialized = testPacket.serialize();
 
         // Build the PacketIn
-        OFPacketIn pi = ((OFPacketIn) BasicFactory.getInstance().getMessage(OFType.PACKET_IN))
+        OFPacketIn pi = ((OFPacketIn) FloodlightFactory.getInstance().getMessage(OFType.PACKET_IN))
                 .setBufferId(-1)
-                .setInPort((short) 1)
+                .setMatch(new OFMatch().setInPort(1))
                 .setPacketData(testPacketSerialized)
                 .setReason(OFPacketInReason.NO_MATCH)
                 .setTotalLength((short) testPacketSerialized.length);

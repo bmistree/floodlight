@@ -3,7 +3,7 @@ package com.bigswitch.floodlight.vendor;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 import org.openflow.protocol.Instantiable;
 import org.openflow.protocol.vendor.OFVendorData;
 
@@ -81,12 +81,12 @@ public class OFInterfaceIPReplyVendorData extends OFBigSwitchVendorData {
     }
     
     /**
-     * Read from the ChannelBuffer
+     * Read from the ByteBuffer
      * @param data the channel buffer from which we're deserializing
      * @param length the length to the end of the enclosing message
      */
     @Override
-    public void readFrom(ChannelBuffer data, int length) {
+    public void readFrom(ByteBuffer data, int length) {
         //datatype read by super class
         super.readFrom(data, length);
         
@@ -107,11 +107,11 @@ public class OFInterfaceIPReplyVendorData extends OFBigSwitchVendorData {
     }
 
     /**
-     * Write to the ChannelBuffer
+     * Write to the ByteBuffer
      * @param data the channel buffer to which we're serializing
      */
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         // datatype written by super class
         super.writeTo(data);
         if (this.interfaces != null) {

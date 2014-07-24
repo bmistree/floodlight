@@ -221,7 +221,7 @@ public class ForwardingTest extends FloodlightTestCase {
                 ((OFPacketIn) mockFloodlightProvider.getOFMessageFactory().
                         getMessage(OFType.PACKET_IN))
                         .setBufferId(-1)
-                        .setInPort((short) 1)
+                        .setMatch(new OFMatch().setInPort(1))
                         .setPacketData(testPacketSerialized)
                         .setReason(OFPacketInReason.NO_MATCH)
                         .setTotalLength((short) testPacketSerialized.length);

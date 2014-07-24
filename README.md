@@ -1,16 +1,38 @@
-Floodlight is the leading open source SDN controller. It is supported by a community of developers including a number of engineers from Big Switch Networks (http://www.bigswitch.com/).
+# Overview
 
-OpenFlow is a open standard managed by Open Networking Foundation. It specifies a protocol through switch a remote controller can modify the behavior of networking devices through a well-defined “forwarding instruction set”. Floodlight is designed to work with the growing number of switches, routers, virtual witches, and access points that support the OpenFlow standard.
+This is a version of the
+[Floodlight](www.projectfloodlight.org/floodlight/) controller with
+support for OpenFlow 1.3. The original code from Big Switch was forked
+off and updated. This repository is a work in progress.
 
-Feature Highlights:
+The current code base is functional for the available applications /
+modules like topology visualization, virtual networking, static flow
+pushers, firewall, and loadbalancer.
 
-- Offers a module loading system that make it simple to extend and enhance.
-- Easy to set up with minimal dependencies
-- Supports a broad range of virtual- and physical- OpenFlow switches
-- Can handle mixed OpenFlow and non-OpenFlow networks – it can manage multiple “islands” of OpenFlow hardware switches
-- Designed to be high-performance – is the core of a commercial product from Big Switch Networks.
-- Support for OpenStack Quantum cloud orchestration platform}
+# Release notes
 
-To download a pre-built VM appliance, access documentation, and sign up for the mailing list, go to:
+* **Dependency on JOpenFlow**: This code depends on the
+[JOpenFlow](http://bitbucket.org/sdnhub/jopenflow) repository also
+maintained by SDN Hub. However, there are slight differences with
+OFError and OFExperimenter. All "Experimenter" keyword is replaced with
+"Vendor" in this repository.
 
-  http://www.projectfloodlight.org/floodlight
+* **Only works with OpenFlow 1.3 switches**: As of now, the
+Floodlight-plus controller does not work with OF1.0 and OF1.3 switches
+at the same time.
+
+* **Support for some features still under works**: Although JOpenFlow
+suppotrs multiple tables, meters, groups and IPv6, the Floodlight
+implementation does not use them to its advantage. 
+
+* **Unit tests still under development**: The unit tests in the src/tests
+directory are still under development and will be updated soon.
+
+# Maintainers
+This code base is maintained by [SDN Hub](http://sdnhub.org). The author
+is Srini Seetharaman (srini.seetharaman@gmail.com)
+
+# Support/discussion forum
+
+(http://sdnhub.org/forums/forum/controller-platforms/floodlight-plus/)
+

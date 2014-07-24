@@ -21,8 +21,6 @@ import net.floodlightcontroller.storage.IResultSet;
 import net.floodlightcontroller.storage.StorageException;
 import net.floodlightcontroller.util.LoadMonitor;
 
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelStateEvent;
@@ -52,15 +50,11 @@ import org.openflow.protocol.OFStatisticsRequest;
 import org.openflow.protocol.OFSwitchConfig;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.OFVendor;
-import org.openflow.protocol.OFError.OFBadActionCode;
-import org.openflow.protocol.OFError.OFBadRequestCode;
-import org.openflow.protocol.OFError.OFErrorType;
-import org.openflow.protocol.OFError.OFFlowModFailedCode;
-import org.openflow.protocol.OFError.OFHelloFailedCode;
-import org.openflow.protocol.OFError.OFPortModFailedCode;
-import org.openflow.protocol.OFError.OFQueueOpFailedCode;
-import org.openflow.protocol.factory.BasicFactory;
-import org.openflow.protocol.factory.MessageParseException;
+import org.openflow.protocol.OFError.*;
+import org.openflow.protocol.hello.OFHelloElement;
+import org.openflow.protocol.hello.OFHelloElementVersionBitmap;
+import org.openflow.protocol.factory.FloodlightFactory;
+import org.openflow.protocol.statistics.OFPortDescription;
 import org.openflow.protocol.statistics.OFDescriptionStatistics;
 import org.openflow.protocol.statistics.OFStatistics;
 import org.openflow.protocol.statistics.OFStatisticsType;
@@ -97,6 +91,7 @@ class OFChannelHandler
     private volatile ChannelState state;
     private RoleChanger roleChanger;
     private OFFeaturesReply featuresReply;
+    private List<OFPortDescription> portDescriptions;
 
     private final ArrayList<OFPortStatus> pendingPortStatusMsg;
 
@@ -173,7 +168,7 @@ class OFChannelHandler
             int nxRole = role.toNxRole();
 
             // Construct the role request message
-            OFVendor roleRequest = (OFVendor)BasicFactory.getInstance()
+            OFVendor roleRequest = (OFVendor)FloodlightFactory.getInstance()
                     .getMessage(OFType.VENDOR);
             roleRequest.setXid(xid);
             roleRequest.setVendor(OFNiciraVendorData.NX_VENDOR_ID);
@@ -299,7 +294,7 @@ class OFChannelHandler
             if (pendingXid == error.getXid()) {
                 boolean isBadRequestError =
                         (error.getErrorType() == OFError.OFErrorType.
-                        OFPET_BAD_REQUEST.getValue());
+                        OFPET_BAD_REQUEST.ordinal());
                 if (isBadRequestError) {
                     counters.roleReplyErrorUnsupported.updateCounterWithFlush();
                     setSwitchRole(pendingRole, RoleRecvStatus.UNSUPPORTED);
@@ -557,8 +552,8 @@ class OFChannelHandler
 
         /**
          * We are waiting for a config reply message. Once we receive it
-         * we send a DescriptionStatsRequest to the switch.
-         * Next state: WAIT_DESCRIPTION_STAT_REPLY
+         * we send a PortDescriptionRequest to the switch.
+         * Next state: WAIT_PORT_DESCRIPTION_REPLY
          */
         WAIT_CONFIG_REPLY(false) {
             @Override
@@ -587,8 +582,8 @@ class OFChannelHandler
                             h.getSwitchInfoString(),
                             m.getMissSendLength());
                 }
-                h.sendHandshakeDescriptionStatsRequest();
-                h.setState(WAIT_DESCRIPTION_STAT_REPLY);
+                h.sendHandshakePortDescriptionRequest();
+                h.setState(WAIT_PORT_DESCRIPTION_REPLY);
             }
 
             @Override
@@ -611,7 +606,62 @@ class OFChannelHandler
 
             @Override
             void processOFError(OFChannelHandler h, OFError m) {
-                if (m.getErrorType() == OFErrorType.OFPET_BAD_REQUEST.getValue()
+                if (m.getErrorType() == OFErrorType.OFPET_BAD_REQUEST.ordinal()
+                        && m.getErrorCode() ==
+                            OFBadRequestCode.OFPBRC_BAD_VENDOR.ordinal()) {
+                    log.debug("Switch {} has multiple tables but does not " +
+                            "support L2 table extension",
+                            h.getSwitchInfoString());
+                    return;
+                }
+                logErrorDisconnect(h, m);
+            }
+
+            @Override
+            void processOFPortStatus(OFChannelHandler h, OFPortStatus m)
+                    throws IOException {
+                h.pendingPortStatusMsg.add(m);
+            }
+        },
+
+        /**
+         * We are waiting for a port description message. Once we receive it
+         * we send a DescriptionStatsRequest to the switch.
+         * Next state: WAIT_DESCRIPTION_STAT_REPLY
+         */
+        WAIT_PORT_DESCRIPTION_REPLY(false) {
+            @Override
+            void processOFStatisticsReply(OFChannelHandler h, OFStatisticsReply m) 
+            		throws IOException {
+                // If invalid statistics reply, then return and stay in same state
+                if (m.getStatisticsType() != OFStatisticsType.PORT_DESC)
+                	return;
+
+                // Read port description, if it has been updated
+                h.portDescriptions = new ArrayList<OFPortDescription>(); 
+                List <? extends OFStatistics> portDescriptions = m.getStatistics();
+                for (OFStatistics portDesc: portDescriptions)
+                	h.portDescriptions.add(((OFPortDescription)portDesc));
+
+                h.sendHandshakeDescriptionStatsRequest();
+                h.setState(WAIT_DESCRIPTION_STAT_REPLY);
+            }
+
+            @Override
+            void processOFBarrierReply(OFChannelHandler h, OFBarrierReply m) {
+                // do nothing;
+            }
+
+            @Override
+            void processOFFeaturesReply(OFChannelHandler h, OFFeaturesReply  m)
+                    throws IOException {
+                // TODO: we could re-set the features reply
+                illegalMessageReceived(h, m);
+            }
+
+            @Override
+            void processOFError(OFChannelHandler h, OFError m) {
+                if (m.getErrorType() == OFErrorType.OFPET_BAD_REQUEST.ordinal()
                         && m.getErrorCode() ==
                             OFBadRequestCode.OFPBRC_BAD_VENDOR.ordinal()) {
                     log.debug("Switch {} has multiple tables but does not " +
@@ -651,19 +701,19 @@ class OFChannelHandler
             @Override
             void processOFStatisticsReply(OFChannelHandler h,
                                           OFStatisticsReply m) {
-                // Read description, if it has been updated
-                OFDescriptionStatistics description =
-                        new OFDescriptionStatistics();
-                ChannelBuffer data =
-                        ChannelBuffers.buffer(description.getLength());
-                OFStatistics f = m.getFirstStatistics();
-                f.writeTo(data);
-                description.readFrom(data);
+                // If invalid statistics reply, then return and stay in same state
+                if (m.getStatisticsType() != OFStatisticsType.DESC)
+                	return;
+                	
+                // Read switch description, if it has been updated
+                OFDescriptionStatistics description = 
+                		(OFDescriptionStatistics)m.getFirstStatistics();
                 h.sw = h.controller.getOFSwitchInstance(description);
                 // set switch information
                 // set features reply and channel first so we a DPID and
                 // channel info.
                 h.sw.setFeaturesReply(h.featuresReply);
+                h.sw.setPortDescriptions(h.portDescriptions);
                 h.sw.setConnected(true);
                 h.sw.setChannel(h.channel);
                 h.sw.setFloodlightProvider(h.controller);
@@ -815,7 +865,7 @@ class OFChannelHandler
                 if (didHandle)
                     return;
                 if (m.getErrorType() ==
-                        OFErrorType.OFPET_BAD_REQUEST.getValue() &&
+                        OFErrorType.OFPET_BAD_REQUEST.ordinal() &&
                    m.getErrorCode() ==
                         OFBadRequestCode.OFPBRC_EPERM.ordinal()) {
                     // We are the master controller and the switch returned
@@ -833,9 +883,9 @@ class OFChannelHandler
                     h.controller.reassertRole(h, Role.MASTER);
                 }
                 else if (m.getErrorType() ==
-                        OFErrorType.OFPET_PORT_MOD_FAILED.getValue() &&
+                        OFErrorType.OFPET_PORT_MOD_FAILED.ordinal() &&
                     m.getErrorCode() ==
-                        OFFlowModFailedCode.OFPFMFC_ALL_TABLES_FULL.ordinal()) {
+                        OFFlowModFailedCode.OFPFMFC_TABLES_FULL.ordinal()) {
                     h.sw.setTableFull(true);
                 }
                 else {
@@ -1198,6 +1248,8 @@ class OFChannelHandler
                 case STATS_REQUEST:
                 case FEATURES_REQUEST:
                 case FLOW_MOD:
+                case GROUP_MOD:
+                case METER_MOD:                	
                     illegalMessageReceived(h, m);
                     break;
             }
@@ -1230,7 +1282,7 @@ class OFChannelHandler
         void processOFEchoRequest(OFChannelHandler h, OFEchoRequest m)
             throws IOException {
             OFEchoReply reply = (OFEchoReply)
-                    BasicFactory.getInstance().getMessage(OFType.ECHO_REPLY);
+                    FloodlightFactory.getInstance().getMessage(OFType.ECHO_REPLY);
             reply.setXid(m.getXid());
             reply.setPayload(m.getPayload());
             reply.setLengthU(m.getLengthU());
@@ -1355,7 +1407,7 @@ class OFChannelHandler
         channel = e.getChannel();
         log.info("New switch connection from {}",
                  channel.getRemoteAddress());
-        sendHandShakeMessage(OFType.HELLO);
+        sendHandShakeHello();
         setState(ChannelState.WAIT_HELLO);
     }
 
@@ -1451,14 +1503,14 @@ class OFChannelHandler
             }
             counters.switchDisconnectSwitchStateException.updateCounterWithFlush();
             ctx.getChannel().close();
-        } else if (e.getCause() instanceof MessageParseException) {
+/*        } else if (e.getCause() instanceof MessageParseException) {
             log.error("Disconnecting switch "
                                  + getSwitchInfoString() +
                                  " due to message parse failure",
                                  e.getCause());
             counters.switchDisconnectParseError.updateCounterWithFlush();
             ctx.getChannel().close();
-        } else if (e.getCause() instanceof StorageException) {
+*/        } else if (e.getCause() instanceof StorageException) {
             log.error("Terminating controller due to storage exception",
                       e.getCause());
             this.controller.terminate();
@@ -1477,7 +1529,7 @@ class OFChannelHandler
     @Override
     public void channelIdle(ChannelHandlerContext ctx, IdleStateEvent e)
             throws Exception {
-        OFMessage m = BasicFactory.getInstance().getMessage(OFType.ECHO_REQUEST);
+        OFMessage m = FloodlightFactory.getInstance().getMessage(OFType.ECHO_REQUEST);
         e.getChannel().write(Collections.singletonList(m));
     }
 
@@ -1603,6 +1655,14 @@ class OFChannelHandler
                 OFBadActionCode bac =
                     OFBadActionCode.values()[0xffff & error.getErrorCode()];
                 return String.format("Error %s %s", et, bac);
+            case OFPET_BAD_INSTRUCTION:
+                OFBadInstructionCode bic =
+                    OFBadInstructionCode.values()[0xffff & error.getErrorCode()];
+                return String.format("Error %s %s", et, bic);
+            case OFPET_BAD_MATCH:
+                OFBadMatchCode bmc =
+                    OFBadMatchCode.values()[0xffff & error.getErrorCode()];
+                return String.format("Error %s %s", et, bmc);
             case OFPET_FLOW_MOD_FAILED:
                 OFFlowModFailedCode fmfc =
                     OFFlowModFailedCode.values()[0xffff & error.getErrorCode()];
@@ -1611,11 +1671,35 @@ class OFChannelHandler
                 OFPortModFailedCode pmfc =
                     OFPortModFailedCode.values()[0xffff & error.getErrorCode()];
                 return String.format("Error %s %s", et, pmfc);
+            case OFPET_GROUP_MOD_FAILED:
+                OFGroupModFailedCode gmfc =
+                    OFGroupModFailedCode.values()[0xffff & error.getErrorCode()];
+                return String.format("Error %s %s", et, gmfc);
+            case OFPET_TABLE_MOD_FAILED:
+                OFTableModFailedCode tmfc =
+                    OFTableModFailedCode.values()[0xffff & error.getErrorCode()];
+                return String.format("Error %s %s", et, tmfc);
             case OFPET_QUEUE_OP_FAILED:
                 OFQueueOpFailedCode qofc =
                     OFQueueOpFailedCode.values()[0xffff & error.getErrorCode()];
                 return String.format("Error %s %s", et, qofc);
-            case OFPET_VENDOR_ERROR:
+            case OFPET_SWITCH_CONFIG_FAILED:
+                OFSwitchConfigFailedCode scfc =
+                	OFSwitchConfigFailedCode.values()[0xffff & error.getErrorCode()];
+                return String.format("Error %s %s", et, scfc);
+            case OFPET_ROLE_REQUEST_FAILED:
+                OFRoleRequestFailedCode rrfc =
+	                OFRoleRequestFailedCode.values()[0xffff & error.getErrorCode()];
+	            return String.format("Error %s %s", et, rrfc);
+            case OFPET_METER_MOD_FAILED:
+                OFMeterModFailedCode mmfc =
+                    OFMeterModFailedCode.values()[0xffff & error.getErrorCode()];
+                return String.format("Error %s %s", et, mmfc);
+            case OFPET_TABLE_FEATURES_FAILED:
+                OFTableFeaturesFailedCode tffc =
+                    OFTableFeaturesFailedCode.values()[0xffff & error.getErrorCode()];
+                return String.format("Error %s %s", et, tffc);
+            case OFPET_VENDOR:
                 // no codes known for vendor error
                 return String.format("Error %s", et);
         }
@@ -1665,8 +1749,26 @@ class OFChannelHandler
      */
     private void sendHandShakeMessage(OFType type) throws IOException {
         // Send initial Features Request
-        OFMessage m = BasicFactory.getInstance().getMessage(type);
+        OFMessage m = FloodlightFactory.getInstance().getMessage(type);
         m.setXid(handshakeTransactionIds--);
+        channel.write(Collections.singletonList(m));
+    }
+
+    /**
+     * Send a hello message to the switch using the handshake transactions ids.
+     */
+    private void sendHandShakeHello() {
+        // Send initial Features Request
+        OFHello m = (OFHello)
+            FloodlightFactory.getInstance().getMessage(OFType.HELLO);
+        m.setXid(handshakeTransactionIds--);
+        List<OFHelloElement> helloElements = new ArrayList<OFHelloElement>();
+        OFHelloElementVersionBitmap hevb = new OFHelloElementVersionBitmap();
+        List<Integer> bitmaps = new ArrayList<Integer>();
+        bitmaps.add(0x10);
+        hevb.setBitmaps(bitmaps);
+        helloElements.add(hevb);
+        m.setHelloElements(helloElements);
         channel.write(Collections.singletonList(m));
     }
 
@@ -1675,7 +1777,7 @@ class OFChannelHandler
      */
     private void sendHandshakeL2TableSet() {
         OFVendor l2TableSet = (OFVendor)
-                BasicFactory.getInstance().getMessage(OFType.VENDOR);
+                FloodlightFactory.getInstance().getMessage(OFType.VENDOR);
         l2TableSet.setXid(handshakeTransactionIds--);
         OFBsnL2TableSetVendorData l2TableSetData =
                 new OFBsnL2TableSetVendorData(true,
@@ -1707,7 +1809,7 @@ class OFChannelHandler
 
         // Ensure we receive the full packet via PacketIn
         // FIXME: We don't set the reassembly flags.
-        OFSetConfig configSet = (OFSetConfig) BasicFactory.getInstance()
+        OFSetConfig configSet = (OFSetConfig) FloodlightFactory.getInstance()
                 .getMessage(OFType.SET_CONFIG);
         configSet.setMissSendLength((short) 0xffff)
             .setLengthU(OFSwitchConfig.MINIMUM_LENGTH);
@@ -1715,27 +1817,39 @@ class OFChannelHandler
         msglist.add(configSet);
 
         // Barrier
-        OFBarrierRequest barrier = (OFBarrierRequest) BasicFactory.getInstance()
+        OFBarrierRequest barrier = (OFBarrierRequest) FloodlightFactory.getInstance()
                 .getMessage(OFType.BARRIER_REQUEST);
         barrier.setXid(handshakeTransactionIds--);
         msglist.add(barrier);
 
         // Verify (need barrier?)
         OFGetConfigRequest configReq = (OFGetConfigRequest)
-                BasicFactory.getInstance().getMessage(OFType.GET_CONFIG_REQUEST);
+                FloodlightFactory.getInstance().getMessage(OFType.GET_CONFIG_REQUEST);
         configReq.setXid(handshakeTransactionIds--);
         msglist.add(configReq);
         channel.write(msglist);
     }
 
     /**
-     * send a description state request
+     * send a port description request
+     * @throws IOException
+     */
+    private void sendHandshakePortDescriptionRequest() throws IOException {
+        OFStatisticsRequest req = new OFStatisticsRequest();
+        req.setStatisticsType(OFStatisticsType.PORT_DESC);
+        req.setXid(handshakeTransactionIds--);
+
+        channel.write(Collections.singletonList(req));
+    }
+
+    /**
+     * send a description stat request
      * @throws IOException
      */
     private void sendHandshakeDescriptionStatsRequest() throws IOException {
         // Get Description to set switch-specific flags
         OFStatisticsRequest req = new OFStatisticsRequest();
-        req.setStatisticType(OFStatisticsType.DESC);
+        req.setStatisticsType(OFStatisticsType.DESC);
         req.setXid(handshakeTransactionIds--);
 
         channel.write(Collections.singletonList(req));

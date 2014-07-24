@@ -26,7 +26,7 @@
     generated code.
 -->
 
-<project default="dist" name="floodlight">
+<project default="dist" name="floodlight-plus">
     <property name="target" location="target"/>
     <property name="build" location="${target}/bin"/>
     <property name="build-test" location="${target}/bin-test"/>
@@ -238,7 +238,8 @@
     </target>
     <target name="coverage" depends="instrument,test,coverage-report"/>
 
-    <target name="dist" depends="compile,compile-test">
+    <!--<target name="dist" depends="compile,compile-test">-->
+    <target name="dist" depends="compile">
         <jar destfile="${floodlight-jar}" filesetmanifest="mergewithoutmain">
             <manifest>
                 <attribute name="Main-Class" value="${main-class}"/>
@@ -253,7 +254,7 @@
                 <patternset refid="lib"/>
             </zipgroupfileset>
         </jar>
-        <jar destfile="${floodlight-test-jar}" filesetmanifest="mergewithoutmain">
+        <!--<jar destfile="${floodlight-test-jar}" filesetmanifest="mergewithoutmain">
             <manifest>
                 <attribute name="Class-Path" value="."/>
             </manifest>
@@ -263,7 +264,7 @@
                 <patternset refid="lib-test"/>
                 <patternset refid="lib-cobertura"/>
             </zipgroupfileset>
-        </jar>
+        </jar>-->
     </target>
 
     <target name="deb" depends="dist">

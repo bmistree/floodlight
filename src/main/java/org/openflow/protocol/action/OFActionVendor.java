@@ -1,33 +1,18 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-*
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol.action;
 
-
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 /**
  *
  * @author David Erickson (daviderickson@cs.stanford.edu)
+ * @author James Hongyi Zeng (hyzeng@stanford.edu)
  */
-public abstract class OFActionVendor extends OFAction {
+public class OFActionVendor extends OFAction {
     public static int MINIMUM_LENGTH = 8;
 
     protected int vendor;
+    protected byte[] data;
 
     public OFActionVendor() {
         super();
@@ -45,50 +30,63 @@ public abstract class OFActionVendor extends OFAction {
     /**
      * @param vendor the vendor to set
      */
-    public void setVendor(int vendor) {
+    public OFActionVendor setVendor(int vendor) {
         this.vendor = vendor;
+        return this;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        this.vendor = data.readInt();
+        this.vendor = data.getInt();
+        int dataLength = this.length - MINIMUM_LENGTH;
+        this.data = new byte[dataLength];
+        data.get(this.data, 0, dataLength);
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeInt(this.vendor);
+        data.putInt(this.vendor);
+        data.put(this.data);
     }
 
     @Override
     public int hashCode() {
         final int prime = 379;
         int result = super.hashCode();
+        result = prime * result + Arrays.hashCode(data);
         result = prime * result + vendor;
         return result;
     }
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) {
+        if (this == obj)
             return true;
-        }
-        if (!super.equals(obj)) {
+        if (!super.equals(obj))
             return false;
-        }
-        if (!(obj instanceof OFActionVendor)) {
+        if (!(obj instanceof OFActionVendor))
             return false;
-        }
         OFActionVendor other = (OFActionVendor) obj;
-        if (vendor != other.vendor) {
+        if (!Arrays.equals(data, other.data))
             return false;
-        }
+        if (vendor != other.vendor)
+            return false;
         return true;
     }
 
-    @Override
-    public String toString() {
-        return super.toString() + "; vendor=" + vendor;
+    /**
+     * @return the data
+     */
+    public byte[] getData() {
+        return data;
+    }
+
+    /**
+     * @param data the data to set
+     */
+    public void setData(byte[] data) {
+        this.data = data;
     }
 }

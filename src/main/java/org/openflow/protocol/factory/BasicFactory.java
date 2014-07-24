@@ -1,38 +1,26 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-*
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol.factory;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionType;
-import org.openflow.protocol.action.OFActionVendor;
+import org.openflow.protocol.instruction.OFInstruction;
+import org.openflow.protocol.instruction.OFInstructionType;
+import org.openflow.protocol.queue.OFQueueProperty;
+import org.openflow.protocol.queue.OFQueuePropertyType;
 import org.openflow.protocol.statistics.OFStatistics;
 import org.openflow.protocol.statistics.OFStatisticsType;
+import org.openflow.protocol.hello.OFHelloElement;
+import org.openflow.protocol.hello.OFHelloElementType;
 import org.openflow.protocol.statistics.OFVendorStatistics;
-import org.openflow.protocol.vendor.OFByteArrayVendorData;
-import org.openflow.protocol.vendor.OFVendorData;
-import org.openflow.protocol.vendor.OFVendorDataType;
-import org.openflow.protocol.vendor.OFVendorId;
+import org.openflow.protocol.meter.OFMeterBand;
+import org.openflow.protocol.meter.OFMeterBandType;
+import org.openflow.protocol.statistics.tableFeatures.OFTableFeaturesProperty;
+import org.openflow.protocol.statistics.tableFeatures.OFTableFeaturesPropertyType;
 
 
 /**
@@ -41,18 +29,17 @@ import org.openflow.protocol.vendor.OFVendorId;
  *
  * @author David Erickson (daviderickson@cs.stanford.edu)
  * @author Rob Sherwood (rob.sherwood@stanford.edu)
+ * @author Srini Seetharaman (srini.seetharaman@gmail.com)
  *
  */
-public enum BasicFactory implements OFMessageFactory, OFActionFactory,
-        OFStatisticsFactory, OFVendorDataFactory {
-    SINGLETON_INSTANCE;
+public class BasicFactory implements OFMessageFactory, OFActionFactory,
+        OFQueuePropertyFactory, OFStatisticsFactory,
+        OFInstructionFactory, OFHelloElementFactory,
+        OFMeterBandFactory, OFTableFeaturesPropertyFactory {
 
+    private static final BasicFactory SINGLETON_INSTANCE = new BasicFactory();
 
-    private final OFVendorActionRegistry vendorActionRegistry;
-
-    private BasicFactory() {
-        vendorActionRegistry = OFVendorActionRegistry.getInstance();
-    }
+    protected BasicFactory() { }
 
     public static BasicFactory getInstance() {
         return SINGLETON_INSTANCE;
@@ -74,43 +61,26 @@ public enum BasicFactory implements OFMessageFactory, OFActionFactory,
     }
 
     @Override
-    public List<OFMessage> parseMessage(ChannelBuffer data) throws MessageParseException {
-        List<OFMessage> msglist = new ArrayList<OFMessage>();
-        OFMessage msg = null;
-
-        while (data.readableBytes() >= OFMessage.MINIMUM_LENGTH) {
-            data.markReaderIndex();
-            msg = this.parseMessageOne(data);
-            if (msg == null) {
-                data.resetReaderIndex();
-                break;
-            }
-            else {
-                msglist.add(msg);
-            }
-        }
-
-        if (msglist.size() == 0) {
-            return null;
-        }
-        return msglist;
-
+    public List<OFMessage> parseMessages(ByteBuffer data) {
+        return parseMessages(data, 0);
     }
 
-    public OFMessage parseMessageOne(ChannelBuffer data) throws MessageParseException {
-        try {
-            OFMessage demux = new OFMessage();
-            OFMessage ofm = null;
+    @Override
+    public List<OFMessage> parseMessages(ByteBuffer data, int limit) {
+        List<OFMessage> results = new ArrayList<OFMessage>();
+        OFMessage demux = new OFMessage();
+        OFMessage ofm;
 
-            if (data.readableBytes() < OFMessage.MINIMUM_LENGTH)
-                return ofm;
+        while (limit == 0 || results.size() <= limit) {
+            if (data.remaining() < OFMessage.MINIMUM_LENGTH)
+                return results;
 
-            data.markReaderIndex();
+            data.mark();
             demux.readFrom(data);
-            data.resetReaderIndex();
+            data.reset();
 
-            if (demux.getLengthU() > data.readableBytes())
-                return ofm;
+            if (demux.getLengthU() > data.remaining())
+                return results;
 
             ofm = getMessage(demux.getType());
             if (ofm == null)
@@ -120,35 +90,39 @@ public enum BasicFactory implements OFMessageFactory, OFActionFactory,
             ofm.readFrom(data);
             if (OFMessage.class.equals(ofm.getClass())) {
                 // advance the position for un-implemented messages
-                data.readerIndex(data.readerIndex()+(ofm.getLengthU() -
+                data.position(data.position()+(ofm.getLengthU() -
                         OFMessage.MINIMUM_LENGTH));
             }
-
-            return ofm;
-        } catch (Exception e) {
-            /* Write the offending data along with the error message */
-            data.resetReaderIndex();
-            String msg =
-                    "Message Parse Error for packet:" +  dumpBuffer(data) +
-                    "\nException: " + e.toString();
-            data.resetReaderIndex();
-
-            throw new MessageParseException(msg, e);
+            results.add(ofm);
         }
+
+        return results;
     }
 
-    private void injectFactories(OFMessage ofm) {
+    protected void injectFactories(OFMessage ofm) {
         if (ofm instanceof OFActionFactoryAware) {
             ((OFActionFactoryAware)ofm).setActionFactory(this);
+        }
+        if (ofm instanceof OFInstructionFactoryAware) {
+            ((OFInstructionFactoryAware)ofm).setInstructionFactory(this);
         }
         if (ofm instanceof OFMessageFactoryAware) {
             ((OFMessageFactoryAware)ofm).setMessageFactory(this);
         }
+        if (ofm instanceof OFQueuePropertyFactoryAware) {
+            ((OFQueuePropertyFactoryAware)ofm).setQueuePropertyFactory(this);
+        }
         if (ofm instanceof OFStatisticsFactoryAware) {
             ((OFStatisticsFactoryAware)ofm).setStatisticsFactory(this);
         }
-        if (ofm instanceof OFVendorDataFactoryAware) {
-            ((OFVendorDataFactoryAware)ofm).setVendorDataFactory(this);
+        if (ofm instanceof OFHelloElementFactoryAware) {
+            ((OFHelloElementFactoryAware)ofm).setHelloElementFactory(this);
+        }
+        if (ofm instanceof OFMeterBandFactoryAware) {
+            ((OFMeterBandFactoryAware)ofm).setMeterBandFactory(this);
+        }
+        if (ofm instanceof OFTableFeaturesPropertyFactoryAware) {
+            ((OFTableFeaturesPropertyFactoryAware)ofm).setTableFeaturesPropertyFactory(this);
         }
     }
 
@@ -158,68 +132,99 @@ public enum BasicFactory implements OFMessageFactory, OFActionFactory,
     }
 
     @Override
-    public List<OFAction> parseActions(ChannelBuffer data, int length) {
+    public List<OFAction> parseActions(ByteBuffer data, int length) {
         return parseActions(data, length, 0);
     }
 
     @Override
-    public List<OFAction> parseActions(ChannelBuffer data, int length, int limit) {
+    public List<OFAction> parseActions(ByteBuffer data, int length, int limit) {
         List<OFAction> results = new ArrayList<OFAction>();
         OFAction demux = new OFAction();
         OFAction ofa;
-        int end = data.readerIndex() + length;
+        int end = data.position() + length;
 
         while (limit == 0 || results.size() <= limit) {
-            if ((data.readableBytes() < OFAction.MINIMUM_LENGTH ||
-                (data.readerIndex() + OFAction.MINIMUM_LENGTH) > end))
+            if (data.remaining() < OFAction.MINIMUM_LENGTH ||
+                    (data.position() + OFAction.MINIMUM_LENGTH) > end)
                 return results;
 
-            data.markReaderIndex();
+            data.mark();
             demux.readFrom(data);
-            data.resetReaderIndex();
+            data.reset();
 
-            if ((demux.getLengthU() > data.readableBytes() ||
-                (data.readerIndex() + demux.getLengthU()) > end))
+            if (demux.getLengthU() > data.remaining() ||
+                    (data.position() + demux.getLengthU()) > end)
                 return results;
 
-            ofa = parseActionOne(demux.getType(), data);
+            ofa = getAction(demux.getType());
+            ofa.readFrom(data);
+            if (OFAction.class.equals(ofa.getClass())) {
+                // advance the position for un-implemented messages
+                data.position(data.position()+(ofa.getLengthU() -
+                        OFAction.MINIMUM_LENGTH));
+            }
             results.add(ofa);
         }
 
         return results;
     }
 
-    private OFAction parseActionOne(OFActionType type, ChannelBuffer data) {
-        OFAction ofa;
-        data.markReaderIndex();
-        ofa = getAction(type);
-        ofa.readFrom(data);
-
-        if(type == OFActionType.VENDOR) {
-            OFActionVendor vendorAction = (OFActionVendor) ofa;
-
-            OFVendorActionFactory vendorActionFactory = vendorActionRegistry.get(vendorAction.getVendor());
-
-            if(vendorActionFactory != null) {
-                // if we have a specific vendorActionFactory for this vendor id,
-                // delegate to it for vendor-specific reparsing of the message
-                data.resetReaderIndex();
-                OFActionVendor newAction = vendorActionFactory.readFrom(data);
-                if(newAction != null)
-                    ofa = newAction;
-            }
-        }
-
-        if (OFAction.class.equals(ofa.getClass())) {
-            // advance the position for un-implemented messages
-            data.readerIndex(data.readerIndex()+(ofa.getLengthU() -
-                    OFAction.MINIMUM_LENGTH));
-        }
-        return ofa;
+    @Override
+    public OFActionFactory getActionFactory() {
+        return this;
     }
 
     @Override
-    public OFActionFactory getActionFactory() {
+    public OFInstruction getInstruction(OFInstructionType t) {
+        return t.newInstance();
+    }
+
+    @Override
+    public List<OFInstruction> parseInstructions(ByteBuffer data, int length) {
+        return parseInstructions(data, length, 0);
+    }
+
+    @Override
+    public List<OFInstruction> parseInstructions(ByteBuffer data, int length, int limit) {
+        List<OFInstruction> results = new ArrayList<OFInstruction>();
+        OFInstruction demux = new OFInstruction();
+        OFInstruction ofi;
+        int end = data.position() + length;
+
+        while (limit == 0 || results.size() <= limit) {
+            if (data.remaining() < OFInstruction.MINIMUM_LENGTH ||
+                    (data.position() + OFInstruction.MINIMUM_LENGTH) > end)
+                return results;
+
+            data.mark();
+            demux.readFrom(data);
+            data.reset();
+
+            if (demux.getLengthU() > data.remaining() ||
+                    (data.position() + demux.getLengthU()) > end)
+                return results;
+
+            ofi = getInstruction(demux.getType());
+
+            // If actions are embedded in the OFInstruction,
+            // then set factory
+            if (ofi instanceof OFActionFactoryAware) 
+                ((OFActionFactoryAware)ofi).setActionFactory(this);
+
+            ofi.readFrom(data);
+            if (OFInstruction.class.equals(ofi.getClass())) {
+                // advance the position for un-implemented messages
+                data.position(data.position()+(ofi.getLengthU() -
+                        OFInstruction.MINIMUM_LENGTH));
+            }
+            results.add(ofi);
+        }
+
+        return results;
+    }
+
+    @Override
+    public OFInstructionFactory getInstructionFactory() {
         return this;
     }
 
@@ -230,7 +235,7 @@ public enum BasicFactory implements OFMessageFactory, OFActionFactory,
 
     @Override
     public List<OFStatistics> parseStatistics(OFType t, OFStatisticsType st,
-                                              ChannelBuffer data, int length) {
+            ByteBuffer data, int length) {
         return parseStatistics(t, st, data, length, 0);
     }
 
@@ -238,28 +243,28 @@ public enum BasicFactory implements OFMessageFactory, OFActionFactory,
      * @param t
      *            OFMessage type: should be one of stats_request or stats_reply
      * @param st
-     *            statistics type of this message, e.g., DESC, TABLE
+     *            type of this statistics message, e.g., DESC, TABLE
      * @param data
      *            buffer to read from
      * @param length
-     *            length of statistics
+     *            length of records
      * @param limit
-     *            number of statistics to grab; 0 == all
-     *
-     * @return list of statistics
+     *            number of records to grab; 0 == all
+     * 
+     * @return list of statistics records
      */
 
     @Override
     public List<OFStatistics> parseStatistics(OFType t, OFStatisticsType st,
-            ChannelBuffer data, int length, int limit) {
+            ByteBuffer data, int length, int limit) {
         List<OFStatistics> results = new ArrayList<OFStatistics>();
         OFStatistics statistics = getStatistics(t, st);
 
-        int start = data.readerIndex();
+        int start = data.position();
         int count = 0;
 
         while (limit == 0 || results.size() <= limit) {
-            // TODO Create a separate MUX/DEMUX path for vendor stats
+            // Create a separate MUX/DEMUX path for vendor stats
             if (statistics instanceof OFVendorStatistics)
                 ((OFVendorStatistics)statistics).setLength(length);
 
@@ -268,8 +273,10 @@ public enum BasicFactory implements OFMessageFactory, OFActionFactory,
              * buffered past this message
              */
             if ((length - count) >= statistics.getLength()) {
-                if (statistics instanceof OFActionFactoryAware)
-                    ((OFActionFactoryAware)statistics).setActionFactory(this);
+                if (statistics instanceof OFInstructionFactoryAware)
+                    ((OFInstructionFactoryAware)statistics).setInstructionFactory(this);
+                else if (statistics instanceof OFTableFeaturesPropertyFactoryAware)
+                    ((OFTableFeaturesPropertyFactoryAware)statistics).setTableFeaturesPropertyFactory(this);
                 statistics.readFrom(data);
                 results.add(statistics);
                 count += statistics.getLength();
@@ -281,10 +288,10 @@ public enum BasicFactory implements OFMessageFactory, OFActionFactory,
                      * though we have a full message. Found when NOX sent
                      * agg_stats request with wrong agg statistics length (52
                      * instead of 56)
-                     *
+                     * 
                      * just throw the rest away, or we will break framing
                      */
-                    data.readerIndex(start + length);
+                    data.position(start + length);
                 }
                 return results;
             }
@@ -292,55 +299,188 @@ public enum BasicFactory implements OFMessageFactory, OFActionFactory,
         return results; // empty; no statistics at all
     }
 
-
     @Override
-    public OFVendorData getVendorData(OFVendorId vendorId,
-                                      OFVendorDataType vendorDataType) {
-        if (vendorDataType == null)
-            return null;
-
-        return vendorDataType.newInstance();
+    public OFQueueProperty getQueueProperty(OFQueuePropertyType t) {
+        return t.newInstance();
     }
 
-    /**
-     * Attempts to parse and return the OFVendorData contained in the given
-     * ChannelBuffer, beginning right after the vendor id.
-     * @param vendor the vendor id that was parsed from the OFVendor message.
-     * @param data the ChannelBuffer from which to parse the vendor data
-     * @param length the length to the end of the enclosing message.
-     * @return an OFVendorData instance
-     */
     @Override
-    public OFVendorData parseVendorData(int vendor, ChannelBuffer data,
+    public List<OFQueueProperty> parseQueueProperties(ByteBuffer data,
             int length) {
-        OFVendorDataType vendorDataType = null;
-        OFVendorId vendorId = OFVendorId.lookupVendorId(vendor);
-        if (vendorId != null) {
-            data.markReaderIndex();
-            vendorDataType = vendorId.parseVendorDataType(data, length);
-            data.resetReaderIndex();
-        }
-
-        OFVendorData vendorData = getVendorData(vendorId, vendorDataType);
-        if (vendorData == null)
-            vendorData = new OFByteArrayVendorData();
-
-        vendorData.readFrom(data, length);
-
-        return vendorData;
+        return parseQueueProperties(data, length, 0);
     }
 
-    public static String dumpBuffer(ChannelBuffer data) {
-        // NOTE: Reads all the bytes in buffer from current read offset.
-        // Set/Reset ReaderIndex if you want to read from a different location
-        int len = data.readableBytes();
-        StringBuffer sb = new StringBuffer();
-        for (int i=0 ; i<len; i++) {
-            if (i%32 == 0) sb.append("\n");
-            if (i%4 == 0) sb.append(" ");
-            sb.append(String.format("%02x", data.getUnsignedByte(i)));
+    @Override
+    public List<OFQueueProperty> parseQueueProperties(ByteBuffer data,
+            int length, int limit) {
+        List<OFQueueProperty> results = new ArrayList<OFQueueProperty>();
+        OFQueueProperty demux = new OFQueueProperty();
+        OFQueueProperty ofqp;
+        int end = data.position() + length;
+
+        while (limit == 0 || results.size() <= limit) {
+            if (data.remaining() < OFQueueProperty.MINIMUM_LENGTH ||
+                    (data.position() + OFQueueProperty.MINIMUM_LENGTH) > end)
+                return results;
+
+            data.mark();
+            demux.readFrom(data);
+            data.reset();
+
+            if (demux.getLengthU() > data.remaining() ||
+                    (data.position() + demux.getLengthU()) > end)
+                return results;
+
+            ofqp = getQueueProperty(demux.getType());
+            ofqp.readFrom(data);
+            if (OFQueueProperty.class.equals(ofqp.getClass())) {
+                // advance the position for un-implemented messages
+                data.position(data.position()+(ofqp.getLengthU() -
+                        OFQueueProperty.MINIMUM_LENGTH));
+            }
+            results.add(ofqp);
         }
-        return sb.toString();
+
+        return results;
+    }
+    @Override
+    public OFHelloElement getHelloElement(OFHelloElementType t) {
+        return t.newInstance();
     }
 
+    @Override
+    public List<OFHelloElement> parseHelloElements(ByteBuffer data,
+            int length) {
+        return parseHelloElements(data, length, 0);
+    }
+
+    @Override
+    public List<OFHelloElement> parseHelloElements(ByteBuffer data,
+            int length, int limit) {
+        List<OFHelloElement> results = new ArrayList<OFHelloElement>();
+        OFHelloElement demux = new OFHelloElement();
+        OFHelloElement ofqp;
+        int end = data.position() + length;
+
+        while (limit == 0 || results.size() <= limit) {
+            if (data.remaining() < OFHelloElement.MINIMUM_LENGTH ||
+                    (data.position() + OFHelloElement.MINIMUM_LENGTH) > end)
+                return results;
+
+            data.mark();
+            demux.readFrom(data);
+            data.reset();
+
+            if (demux.getLengthU() > data.remaining() ||
+                    (data.position() + demux.getLengthU()) > end)
+                return results;
+
+            ofqp = getHelloElement(demux.getType());
+            ofqp.readFrom(data);
+            if (OFHelloElement.class.equals(ofqp.getClass())) {
+                // advance the position for un-implemented messages
+                data.position(data.position()+(ofqp.getLengthU() -
+                        OFHelloElement.MINIMUM_LENGTH));
+            }
+            results.add(ofqp);
+        }
+
+        return results;
+    }
+
+    @Override
+    public OFMeterBand getMeterBand(OFMeterBandType t) {
+        return t.newInstance();
+    }
+
+    @Override
+    public List<OFMeterBand> parseMeterBands(ByteBuffer data,
+            int length) {
+        return parseMeterBands(data, length, 0);
+    }
+
+    @Override
+    public List<OFMeterBand> parseMeterBands(ByteBuffer data,
+            int length, int limit) {
+        List<OFMeterBand> results = new ArrayList<OFMeterBand>();
+        OFMeterBand demux = new OFMeterBand();
+        OFMeterBand ofqp;
+        int end = data.position() + length;
+
+        while (limit == 0 || results.size() <= limit) {
+            if (data.remaining() < OFMeterBand.MINIMUM_LENGTH ||
+                    (data.position() + OFMeterBand.MINIMUM_LENGTH) > end)
+                return results;
+
+            data.mark();
+            demux.readFrom(data);
+            data.reset();
+
+            if (demux.getLengthU() > data.remaining() ||
+                    (data.position() + demux.getLengthU()) > end)
+                return results;
+
+            ofqp = getMeterBand(demux.getType());
+            ofqp.readFrom(data);
+            if (OFMeterBand.class.equals(ofqp.getClass())) {
+                // advance the position for un-implemented messages
+                data.position(data.position()+(ofqp.getLengthU() -
+                        OFMeterBand.MINIMUM_LENGTH));
+            }
+            results.add(ofqp);
+        }
+
+        return results;
+   }
+
+    @Override
+    public OFTableFeaturesProperty getTableFeaturesProperty(OFTableFeaturesPropertyType t) {
+        return t.newInstance();
+    }
+
+    @Override
+    public List<OFTableFeaturesProperty> parseTableFeaturesProperties(ByteBuffer data,
+            int length) {
+        return parseTableFeaturesProperties(data, length, 0);
+    }
+
+    @Override
+    public List<OFTableFeaturesProperty> parseTableFeaturesProperties(ByteBuffer data,
+            int length, int limit) {
+        List<OFTableFeaturesProperty> results = new ArrayList<OFTableFeaturesProperty>();
+        OFTableFeaturesProperty demux = new OFTableFeaturesProperty();
+        OFTableFeaturesProperty oftfp;
+        int end = data.position() + length;
+
+        while (limit == 0 || results.size() <= limit) {
+            if (data.remaining() < OFTableFeaturesProperty.MINIMUM_LENGTH ||
+                    (data.position() + OFTableFeaturesProperty.MINIMUM_LENGTH) > end)
+                return results;
+
+            data.mark();
+            demux.readFrom(data);
+            data.reset();
+
+            if (demux.getLengthU() > data.remaining() ||
+                    (data.position() + demux.getLengthU()) > end)
+                return results;
+
+            oftfp = getTableFeaturesProperty(demux.getType());
+            if (oftfp instanceof OFInstructionFactoryAware) 
+                ((OFInstructionFactoryAware)oftfp).setInstructionFactory(this);
+            else if (oftfp instanceof OFActionFactoryAware) 
+                ((OFActionFactoryAware)oftfp).setActionFactory(this);
+
+            oftfp.readFrom(data);
+            if (OFTableFeaturesProperty.class.equals(oftfp.getClass())) {
+                // advance the position for un-implemented messages
+                data.position(data.position()+(oftfp.getLengthU() -
+                        OFTableFeaturesProperty.MINIMUM_LENGTH));
+            }
+            results.add(oftfp);
+        }
+
+        return results;
+    }    
 }
+

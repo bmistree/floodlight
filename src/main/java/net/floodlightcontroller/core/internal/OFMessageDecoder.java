@@ -18,13 +18,14 @@
 package net.floodlightcontroller.core.internal;
 
 import java.util.List;
+import java.nio.ByteBuffer;
 
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.handler.codec.frame.FrameDecoder;
 import org.openflow.protocol.OFMessage;
-import org.openflow.protocol.factory.BasicFactory;
+import org.openflow.protocol.factory.FloodlightFactory;
 import org.openflow.protocol.factory.OFMessageFactory;
 
 /**
@@ -34,7 +35,7 @@ import org.openflow.protocol.factory.OFMessageFactory;
  */
 public class OFMessageDecoder extends FrameDecoder {
 
-    OFMessageFactory factory = BasicFactory.getInstance();
+    OFMessageFactory factory = FloodlightFactory.getInstance();
     
     @Override
     protected Object decode(ChannelHandlerContext ctx, Channel channel,
@@ -45,8 +46,16 @@ public class OFMessageDecoder extends FrameDecoder {
             return null;
         }
 
-        List<OFMessage> message = factory.parseMessage(buffer);
-        return message;
+        ByteBuffer data = buffer.toByteBuffer();
+        List<OFMessage> message = factory.parseMessages(data);
+        if (message.size() == 0)
+        	return null;
+        else {
+            //Following call to readerIndex is necessary in case of 
+            // channelBuffer to byteBuffer conversion above
+            buffer.readerIndex(data.position());
+	        return message;
+        }
     }
 
     @Override

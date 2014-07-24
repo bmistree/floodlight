@@ -1,37 +1,16 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-* 
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol.statistics;
 
-
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.openflow.util.StringByteSerializer;
+import java.nio.ByteBuffer;
 
 /**
  * Represents an ofp_table_stats structure
  * @author David Erickson (daviderickson@cs.stanford.edu)
- */
+ * @author Srini Seetharaman (srini.seetharaman@gmail.com)
+  */
 public class OFTableStatistics implements OFStatistics {
-    public static int MAX_TABLE_NAME_LEN = 32;
+    public static int MINIMUM_LENGTH = 24;
 
     protected byte tableId;
-    protected String name;
-    protected int wildcards;
-    protected int maximumEntries;
     protected int activeCount;
     protected long lookupCount;
     protected long matchedCount;
@@ -46,50 +25,9 @@ public class OFTableStatistics implements OFStatistics {
     /**
      * @param tableId the tableId to set
      */
-    public void setTableId(byte tableId) {
+    public OFTableStatistics setTableId(byte tableId) {
         this.tableId = tableId;
-    }
-
-    /**
-     * @return the name
-     */
-    public String getName() {
-        return name;
-    }
-
-    /**
-     * @param name the name to set
-     */
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    /**
-     * @return the wildcards
-     */
-    public int getWildcards() {
-        return wildcards;
-    }
-
-    /**
-     * @param wildcards the wildcards to set
-     */
-    public void setWildcards(int wildcards) {
-        this.wildcards = wildcards;
-    }
-
-    /**
-     * @return the maximumEntries
-     */
-    public int getMaximumEntries() {
-        return maximumEntries;
-    }
-
-    /**
-     * @param maximumEntries the maximumEntries to set
-     */
-    public void setMaximumEntries(int maximumEntries) {
-        this.maximumEntries = maximumEntries;
+        return this;
     }
 
     /**
@@ -102,8 +40,9 @@ public class OFTableStatistics implements OFStatistics {
     /**
      * @param activeCount the activeCount to set
      */
-    public void setActiveCount(int activeCount) {
+    public OFTableStatistics setActiveCount(int activeCount) {
         this.activeCount = activeCount;
+        return this;
     }
 
     /**
@@ -116,8 +55,9 @@ public class OFTableStatistics implements OFStatistics {
     /**
      * @param lookupCount the lookupCount to set
      */
-    public void setLookupCount(long lookupCount) {
+    public OFTableStatistics setLookupCount(long lookupCount) {
         this.lookupCount = lookupCount;
+        return this;
     }
 
     /**
@@ -130,41 +70,36 @@ public class OFTableStatistics implements OFStatistics {
     /**
      * @param matchedCount the matchedCount to set
      */
-    public void setMatchedCount(long matchedCount) {
+    public OFTableStatistics setMatchedCount(long matchedCount) {
         this.matchedCount = matchedCount;
+        return this;
     }
 
     @Override
     public int getLength() {
-        return 64;
+        return MINIMUM_LENGTH;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
-        this.tableId = data.readByte();
-        data.readByte(); // pad
-        data.readByte(); // pad
-        data.readByte(); // pad
-        this.name = StringByteSerializer.readFrom(data, MAX_TABLE_NAME_LEN);
-        this.wildcards = data.readInt();
-        this.maximumEntries = data.readInt();
-        this.activeCount = data.readInt();
-        this.lookupCount = data.readLong();
-        this.matchedCount = data.readLong();
+    public void readFrom(ByteBuffer data) {
+        this.tableId = data.get();
+        data.get(); // pad
+        data.get(); // pad
+        data.get(); // pad
+        this.activeCount = data.getInt();
+        this.lookupCount = data.getLong();
+        this.matchedCount = data.getLong();
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
-        data.writeByte(this.tableId);
-        data.writeByte((byte) 0); // pad
-        data.writeByte((byte) 0); // pad
-        data.writeByte((byte) 0); // pad
-        StringByteSerializer.writeTo(data, MAX_TABLE_NAME_LEN, this.name);
-        data.writeInt(this.wildcards);
-        data.writeInt(this.maximumEntries);
-        data.writeInt(this.activeCount);
-        data.writeLong(this.lookupCount);
-        data.writeLong(this.matchedCount);
+    public void writeTo(ByteBuffer data) {
+        data.put(this.tableId);
+        data.put((byte) 0); // pad
+        data.put((byte) 0); // pad
+        data.put((byte) 0); // pad
+        data.putInt(this.activeCount);
+        data.putLong(this.lookupCount);
+        data.putLong(this.matchedCount);
     }
 
     @Override
@@ -174,10 +109,7 @@ public class OFTableStatistics implements OFStatistics {
         result = prime * result + activeCount;
         result = prime * result + (int) (lookupCount ^ (lookupCount >>> 32));
         result = prime * result + (int) (matchedCount ^ (matchedCount >>> 32));
-        result = prime * result + maximumEntries;
-        result = prime * result + ((name == null) ? 0 : name.hashCode());
         result = prime * result + tableId;
-        result = prime * result + wildcards;
         return result;
     }
 
@@ -202,22 +134,14 @@ public class OFTableStatistics implements OFStatistics {
         if (matchedCount != other.matchedCount) {
             return false;
         }
-        if (maximumEntries != other.maximumEntries) {
-            return false;
-        }
-        if (name == null) {
-            if (other.name != null) {
-                return false;
-            }
-        } else if (!name.equals(other.name)) {
-            return false;
-        }
         if (tableId != other.tableId) {
             return false;
         }
-        if (wildcards != other.wildcards) {
-            return false;
-        }
         return true;
+    }
+
+    @Override
+    public int computeLength() {
+        return getLength();
     }
 }

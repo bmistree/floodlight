@@ -1,35 +1,16 @@
-/**
-*    Copyright (c) 2008 The Board of Trustees of The Leland Stanford Junior
-*    University
-*
-*    Licensed under the Apache License, Version 2.0 (the "License"); you may
-*    not use this file except in compliance with the License. You may obtain
-*    a copy of the License at
-*
-*         http://www.apache.org/licenses/LICENSE-2.0
-*
-*    Unless required by applicable law or agreed to in writing, software
-*    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-*    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-*    License for the specific language governing permissions and limitations
-*    under the License.
-**/
-
 package org.openflow.protocol;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
-import org.openflow.protocol.factory.MessageParseException;
 import org.openflow.protocol.factory.OFMessageFactory;
 import org.openflow.protocol.factory.OFMessageFactoryAware;
 import org.openflow.util.U16;
 
 /**
  * Represents an ofp_error_msg
- *
+ * 
  * @author David Erickson (daviderickson@cs.stanford.edu)
  * @author Rob Sherwood (rob.sherwood@stanford.edu)
  */
@@ -37,13 +18,10 @@ public class OFError extends OFMessage implements OFMessageFactoryAware {
     public static int MINIMUM_LENGTH = 12;
 
     public enum OFErrorType {
-        // OFPET_VENDOR_ERROR is an extension that was added in Open vSwitch and isn't
-        // in the OF 1.0 spec, but it was easier to add it here instead of adding
-        // generic support for extensible vendor-defined error messages.
-        // It uses the random value 0xb0c2 to avoid conflicts with other possible new
-        // error types. Support for vendor-defined extended errors has been standardized
-        // in the OF 1.2 spec, so this workaround is only needed for 1.0.
-        OFPET_HELLO_FAILED, OFPET_BAD_REQUEST, OFPET_BAD_ACTION, OFPET_FLOW_MOD_FAILED, OFPET_PORT_MOD_FAILED, OFPET_QUEUE_OP_FAILED, OFPET_VENDOR_ERROR((short)0xb0c2);
+        OFPET_HELLO_FAILED, OFPET_BAD_REQUEST, OFPET_BAD_ACTION, OFPET_BAD_INSTRUCTION, OFPET_BAD_MATCH, 
+        OFPET_FLOW_MOD_FAILED, OFPET_GROUP_MOD_FAILED, OFPET_PORT_MOD_FAILED, OFPET_TABLE_MOD_FAILED, 
+        OFPET_QUEUE_OP_FAILED, OFPET_SWITCH_CONFIG_FAILED, OFPET_ROLE_REQUEST_FAILED, OFPET_METER_MOD_FAILED,
+        OFPET_TABLE_FEATURES_FAILED, OFPET_VENDOR;
 
         protected short value;
 
@@ -65,30 +43,73 @@ public class OFError extends OFMessage implements OFMessageFactoryAware {
     }
 
     public enum OFBadRequestCode {
-        OFPBRC_BAD_VERSION, OFPBRC_BAD_TYPE, OFPBRC_BAD_STAT, OFPBRC_BAD_VENDOR, OFPBRC_BAD_SUBTYPE, OFPBRC_EPERM, OFPBRC_BAD_LEN, OFPBRC_BUFFER_EMPTY, OFPBRC_BUFFER_UNKNOWN
+        OFPBRC_BAD_VERSION, OFPBRC_BAD_TYPE, OFPBRC_BAD_STATS, OFPBRC_BAD_VENDOR, OFPBRC_BAD_EXP_TYPE,
+        OFPBRC_EPERM, OFPBRC_BAD_LEN, OFPBRC_BUFFER_EMPTY, OFPBRC_BUFFER_UNKNOWN, OFPBRC_BAD_TABLE_ID, 
+        OFPBRC_IS_SLAVE, OFPBRC_BAD_PORT, OFPBRC_BAD_PACKET, OFPBRC_STATS_BUFFER_OVERFLOW
     }
 
     public enum OFBadActionCode {
-        OFPBAC_BAD_TYPE, OFPBAC_BAD_LEN, OFPBAC_BAD_VENDOR, OFPBAC_BAD_VENDOR_TYPE, OFPBAC_BAD_OUT_PORT, OFPBAC_BAD_ARGUMENT, OFPBAC_EPERM, OFPBAC_TOO_MANY, OFPBAC_BAD_QUEUE
+        OFPBAC_BAD_TYPE, OFPBAC_BAD_LEN, OFPBAC_BAD_VENDOR, OFPBAC_BAD_EXP_TYPE, 
+        OFPBAC_BAD_OUT_PORT, OFPBAC_BAD_ARGUMENT, OFPBAC_EPERM, OFPBAC_TOO_MANY, OFPBAC_BAD_QUEUE,
+        OFPBAC_BAD_OUT_GROUP, OFPBAC_MATCH_INCONSISTENT, OFPBAC_UNSUPPORTED_ORDER, OFPBAC_BAD_TAG,
+        OFPBAC_BAD_SET_TYPE, OFPBAC_BAD_SET_LEN, OFPBAC_BAD_SET_ARGUMENT
     }
 
+    public enum OFBadInstructionCode {
+        OFPBIC_UNKNOWN_INST, OFPBIC_UNSUP_INST, OFPBIC_BAD_TABLE_ID, OFPBIC_UNSUP_METADATA, OFPBIC_UNSUP_METADATA_MASK,
+        OFPBIC_BAD_VENDOR, OFPBIC_BAD_EXP_TYPE, OFPBIC_BAD_LEN, OFPBIC_EPERM 
+    }
+    
+    public enum OFBadMatchCode {
+        OFPBMC_BAD_TYPE, OFPBMC_BAD_LEN, OFPBMC_BAD_TAG, OFPBMC_BAD_DL_ADDR_MASK, OFPBMC_BAD_NW_ADDR_MASK, 
+        OFPBMC_BAD_WILDCARDS, OFPBMC_BAD_FIELD, OFPBMC_BAD_VALUE, OFPBMC_BAD_MASK, OFPBMC_BAD_PREREQ,
+        OFPBMC_DUP_FIELD, OFPBMC_EPERM
+    }
     public enum OFFlowModFailedCode {
-        OFPFMFC_ALL_TABLES_FULL, OFPFMFC_OVERLAP, OFPFMFC_EPERM, OFPFMFC_BAD_EMERG_TIMEOUT, OFPFMFC_BAD_COMMAND, OFPFMFC_UNSUPPORTED
+        OFPFMFC_UNKNOWN, OFPFMFC_TABLES_FULL, OFPFMFC_BAD_TABLE_ID, OFPFMFC_OVERLAP, 
+        OFPFMFC_EPERM, OFPFMFC_BAD_TIMEOUT, OFPFMFC_BAD_COMMAND, OFPFMFC_BAD_FLAGS
     }
 
+    public enum OFGroupModFailedCode {
+        OFPGMFC_GROUP_EXISTS, OFPGMFC_INVALID_GROUP, OFPGMFC_WEIGHT_UNSUPPORTED, OFPGMFC_OUT_OF_GROUPS,
+        OFPGMFC_OUT_OF_BUCKETS, OFPGMFC_CHAINING_UNSUPPORTED, OFPGMFC_WATCH_UNSUPPORTED, OFPGMFC_LOOP,
+        OFPGMFC_UNKNOWN_GROUP, OFPGMFC_CHAINED_GROUP, OFPGMFC_BAD_TYPE, OFPGMFC_BAD_COMMAND, 
+        OFPGMFC_BAD_BUCKET, OFPGMFC_BAD_WATCH, OFPGMFC_EPERM
+    }
+    
     public enum OFPortModFailedCode {
-        OFPPMFC_BAD_PORT, OFPPMFC_BAD_HW_ADDR
+        OFPPMFC_BAD_PORT, OFPPMFC_BAD_HW_ADDR, OFPPMFC_BAD_CONFIG, OFPPMFC_BAD_ADVERTISE, OFPPMFC_EPERM
     }
 
+    public enum OFTableModFailedCode {
+        OFPTMFC_BAD_TABLE, OFPTMFC_BAD_CONFIG, OFPTMFC_EPERM
+    }
+    
+    public enum OFMeterModFailedCode {
+    	OFPMMFC_UNKNOWN, OFPMMFC_METER_EXISTS, OFPMMFC_INVALID_METER, OFPMMFC_UNKNOWN_METER, 
+    	OFPMMFC_BAD_COMMAND, OFPMMFC_BAD_FLAGS, OFPMMFC_BAD_RATE, OFPMMFC_BAD_BURST, 
+    	OFPMMFC_BAD_BAND, OFPMMFC_BAD_BAND_VALUE, OFPMMFC_OUT_OF_METERS, OFPMMFC_OUT_OF_BANDS
+    }
+    
     public enum OFQueueOpFailedCode {
         OFPQOFC_BAD_PORT, OFPQOFC_BAD_QUEUE, OFPQOFC_EPERM
     }
 
+    public enum OFSwitchConfigFailedCode {
+        OFPSCFC_BAD_FLAGS, OFPSCFC_BAD_LEN, OFPSCFC_EPERM
+    }
+
+    public enum OFRoleRequestFailedCode {
+        OFPRRFC_STALE, OFPRRFC_UNSUP, OFPRRFC_BAD_ROLE
+    }
+    
+    public enum OFTableFeaturesFailedCode {
+        OFPTFFC_BAD_TABLE, OFPTFFC_BAD_METADATA, OFPTFFC_BAD_TYPE, 
+        OFPTFFC_BAD_LEN, OFPTFFC_BAD_ARGUMENT, OFPTFFC_EPERM
+    }
+    
     protected short errorType;
     protected short errorCode;
-    protected int vendor;
-    protected int vendorErrorType;
-    protected short vendorErrorCode;
     protected OFMessageFactory factory;
     protected byte[] error;
     protected boolean errorIsAscii;
@@ -97,12 +118,6 @@ public class OFError extends OFMessage implements OFMessageFactoryAware {
         super();
         this.type = OFType.ERROR;
         this.length = U16.t(MINIMUM_LENGTH);
-    }
-
-    /** convenience constructor */
-    public OFError(OFErrorType errorType) {
-        this();
-        setErrorType(errorType);
     }
 
     /**
@@ -116,19 +131,14 @@ public class OFError extends OFMessage implements OFMessageFactoryAware {
      * @param errorType
      *            the errorType to set
      */
-    public void setErrorType(short errorType) {
+    public OFError setErrorType(short errorType) {
         this.errorType = errorType;
+        return this;
     }
 
-    public void setErrorType(OFErrorType type) {
-        this.errorType = type.getValue();
-    }
-
-    /**
-     * @return true if the error is an extended vendor error
-     */
-    public boolean isVendorError() {
-        return errorType == OFErrorType.OFPET_VENDOR_ERROR.getValue();
+    public OFError setErrorType(OFErrorType type) {
+        this.errorType = (short) type.ordinal();
+        return this;
     }
 
     /**
@@ -142,81 +152,77 @@ public class OFError extends OFMessage implements OFMessageFactoryAware {
      * @param errorCode
      *            the errorCode to set
      */
-    public void setErrorCode(OFHelloFailedCode code) {
+    public OFError setErrorCode(OFHelloFailedCode code) {
         this.errorCode = (short) code.ordinal();
+        return this;
     }
 
-    public void setErrorCode(short errorCode) {
+    public OFError setErrorCode(short errorCode) {
         this.errorCode = errorCode;
+        return this;
     }
 
-    public void setErrorCode(OFBadRequestCode code) {
+    public OFError setErrorCode(OFBadRequestCode code) {
         this.errorCode = (short) code.ordinal();
+        return this;
     }
 
-    public void setErrorCode(OFBadActionCode code) {
+    public OFError setErrorCode(OFBadActionCode code) {
         this.errorCode = (short) code.ordinal();
+        return this;
     }
 
-    public void setErrorCode(OFFlowModFailedCode code) {
+    public OFError setErrorCode(OFFlowModFailedCode code) {
         this.errorCode = (short) code.ordinal();
+        return this;
     }
 
-    public void setErrorCode(OFPortModFailedCode code) {
+    public OFError setErrorCode(OFPortModFailedCode code) {
         this.errorCode = (short) code.ordinal();
+        return this;
     }
 
-    public void setErrorCode(OFQueueOpFailedCode code) {
+    public OFError setErrorCode(OFQueueOpFailedCode code) {
         this.errorCode = (short) code.ordinal();
+        return this;
     }
 
-    public int getVendorErrorType() {
-        return vendorErrorType;
-    }
-
-    public void setVendorErrorType(int vendorErrorType) {
-        this.vendorErrorType = vendorErrorType;
-    }
-
-    public short getVendorErrorCode() {
-        return vendorErrorCode;
-    }
-
-    public void setVendorErrorCode(short vendorErrorCode) {
-        this.vendorErrorCode = vendorErrorCode;
-    }
-
-    public OFMessage getOffendingMsg() throws MessageParseException {
+    public OFMessage getOffendingMsg() {
         // should only have one message embedded; if more than one, just
         // grab first
         if (this.error == null)
             return null;
-        ChannelBuffer errorMsg = ChannelBuffers.wrappedBuffer(this.error);
+        ByteBuffer errorMsg = ByteBuffer.wrap(this.error);
         if (factory == null)
             throw new RuntimeException("MessageFactory not set");
-
-        List<OFMessage> msglist = this.factory.parseMessage(errorMsg);
-        if (msglist == null)
-                return null;
-        return msglist.get(0);
+        List<OFMessage> messages = this.factory.parseMessages(errorMsg,
+                error.length);
+        // OVS apparently sends partial messages in errors
+        // need to be careful of that AND can't use data.limit() as
+        // a packet boundary because there could be more data queued
+        if (messages.size() > 0)
+            return messages.get(0);
+        else
+            return null;
     }
 
     /**
      * Write this offending message into the payload of the Error message
-     *
+     * 
      * @param offendingMsg
      */
 
-    public void setOffendingMsg(OFMessage offendingMsg) {
+    public OFError setOffendingMsg(OFMessage offendingMsg) {
         if (offendingMsg == null) {
             super.setLengthU(MINIMUM_LENGTH);
         } else {
             this.error = new byte[offendingMsg.getLengthU()];
-            ChannelBuffer data = ChannelBuffers.wrappedBuffer(this.error);
-            data.writerIndex(0);
-            offendingMsg.writeTo(data);
+            ByteBuffer errorMsg = ByteBuffer.wrap(this.error);
+            //data.writerIndex(0);
+            offendingMsg.writeTo(errorMsg);
             super.setLengthU(MINIMUM_LENGTH + offendingMsg.getLengthU());
         }
+        return this;
     }
 
     public OFMessageFactory getFactory() {
@@ -239,8 +245,9 @@ public class OFError extends OFMessage implements OFMessageFactoryAware {
      * @param error
      *            the error to set
      */
-    public void setError(byte[] error) {
+    public OFError setError(byte[] error) {
         this.error = error;
+        return this;
     }
 
     /**
@@ -254,36 +261,37 @@ public class OFError extends OFMessage implements OFMessageFactoryAware {
      * @param errorIsAscii
      *            the errorIsAscii to set
      */
-    public void setErrorIsAscii(boolean errorIsAscii) {
+    public OFError setErrorIsAscii(boolean errorIsAscii) {
         this.errorIsAscii = errorIsAscii;
+        return this;
     }
 
     @Override
-    public void readFrom(ChannelBuffer data) {
+    public void readFrom(ByteBuffer data) {
         super.readFrom(data);
-        this.errorType = data.readShort();
-        this.errorCode = data.readShort();
+        this.errorType = data.getShort();
+        this.errorCode = data.getShort();
         int dataLength = this.getLengthU() - MINIMUM_LENGTH;
         if (dataLength > 0) {
             this.error = new byte[dataLength];
-            data.readBytes(this.error);
-            if (this.errorType == OFErrorType.OFPET_HELLO_FAILED.getValue())
+            data.get(this.error);
+            if (this.errorType == OFErrorType.OFPET_HELLO_FAILED.ordinal())
                 this.errorIsAscii = true;
         }
     }
 
     @Override
-    public void writeTo(ChannelBuffer data) {
+    public void writeTo(ByteBuffer data) {
         super.writeTo(data);
-        data.writeShort(errorType);
-        data.writeShort(errorCode);
+        data.putShort(errorType);
+        data.putShort(errorCode);
         if (error != null)
-            data.writeBytes(error);
+            data.put(error);
     }
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Object#hashCode()
      */
     @Override
@@ -299,7 +307,7 @@ public class OFError extends OFMessage implements OFMessageFactoryAware {
 
     /*
      * (non-Javadoc)
-     *
+     * 
      * @see java.lang.Object#equals(java.lang.Object)
      */
     @Override
@@ -322,4 +330,67 @@ public class OFError extends OFMessage implements OFMessageFactoryAware {
         return true;
     }
 
+    public String getErrorCodeName(OFErrorType errorType, int errorCode) {
+        switch (errorType) {
+            case OFPET_HELLO_FAILED:
+                return OFHelloFailedCode.values()[errorCode].name();
+
+            case OFPET_BAD_REQUEST:
+                return OFBadRequestCode.values()[errorCode].name();
+        
+            case OFPET_BAD_ACTION:
+                return OFBadActionCode.values()[errorCode].name();
+        
+            case OFPET_BAD_INSTRUCTION:
+                return OFBadInstructionCode.values()[errorCode].name();
+        
+            case OFPET_BAD_MATCH:
+                return OFBadMatchCode.values()[errorCode].name();
+        
+            case OFPET_FLOW_MOD_FAILED:
+                return OFFlowModFailedCode.values()[errorCode].name();
+        
+            case OFPET_GROUP_MOD_FAILED:
+                return OFGroupModFailedCode.values()[errorCode].name();
+        
+            case OFPET_PORT_MOD_FAILED:
+                return OFPortModFailedCode.values()[errorCode].name();
+        
+            case OFPET_TABLE_MOD_FAILED:
+                return OFTableModFailedCode.values()[errorCode].name();
+        
+            case OFPET_QUEUE_OP_FAILED:
+                return OFQueueOpFailedCode.values()[errorCode].name();
+        
+            case OFPET_SWITCH_CONFIG_FAILED:
+                return OFSwitchConfigFailedCode.values()[errorCode].name();
+        
+            case OFPET_ROLE_REQUEST_FAILED:
+                return OFRoleRequestFailedCode.values()[errorCode].name();
+        
+            case OFPET_METER_MOD_FAILED:
+                return OFMeterModFailedCode.values()[errorCode].name();
+        
+            case OFPET_TABLE_FEATURES_FAILED:
+                return OFTableFeaturesFailedCode.values()[errorCode].name();
+                
+            default:
+                return null;
+        }
+    }
+    
+    @Override
+    public String toString() {
+        OFErrorType eType = OFErrorType.values()[errorType];
+        return "OFError [type=" +  eType.name() + 
+                ", code=" + getErrorCodeName(eType, errorCode) + "]";
+    }
+    
+    /* (non-Javadoc)
+     * @see org.openflow.protocol.OFMessage#computeLength()
+     */
+    @Override
+    public void computeLength() {
+        this.length = U16.t(MINIMUM_LENGTH + ((error != null) ? error.length : 0));
+    }
 }

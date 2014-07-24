@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 public class LearningSwitchTable extends ServerResource {
     protected static Logger log = LoggerFactory.getLogger(LearningSwitchTable.class);
 
-    protected Map<String, Object> formatTableEntry(MacVlanPair key, short port) {
+    protected Map<String, Object> formatTableEntry(MacVlanPair key, int port) {
         Map<String, Object> entry = new HashMap<String, Object>();
         entry.put("mac", HexString.toHexString(key.mac));
         entry.put("vlan", key.vlan);
@@ -44,9 +44,9 @@ public class LearningSwitchTable extends ServerResource {
         return entry;
     }
 
-    protected List<Map<String, Object>> getOneSwitchTable(Map<MacVlanPair, Short> switchMap) {
+    protected List<Map<String, Object>> getOneSwitchTable(Map<MacVlanPair, Integer> switchMap) {
         List<Map<String, Object>> switchTable = new ArrayList<Map<String, Object>>();
-        for (Entry<MacVlanPair, Short> entry : switchMap.entrySet()) {
+        for (Entry<MacVlanPair, Integer> entry : switchMap.entrySet()) {
             switchTable.add(formatTableEntry(entry.getKey(), entry.getValue()));
         }
         return switchTable;
@@ -58,7 +58,7 @@ public class LearningSwitchTable extends ServerResource {
                 (ILearningSwitchService)getContext().getAttributes().
                     get(ILearningSwitchService.class.getCanonicalName());
 
-        Map<IOFSwitch, Map<MacVlanPair,Short>> table = lsp.getTable();
+        Map<IOFSwitch, Map<MacVlanPair,Integer>> table = lsp.getTable();
         Map<String, List<Map<String, Object>>> allSwitchTableJson = new HashMap<String, List<Map<String, Object>>>();
 
         String switchId = (String) getRequestAttributes().get("switch");

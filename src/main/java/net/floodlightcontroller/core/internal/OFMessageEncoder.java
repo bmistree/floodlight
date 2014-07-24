@@ -18,6 +18,7 @@
 package net.floodlightcontroller.core.internal;
 
 import java.util.List;
+import java.nio.ByteBuffer;
 
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
@@ -43,13 +44,21 @@ public class OFMessageEncoder extends OneToOneEncoder {
         List<OFMessage> msglist = (List<OFMessage>)msg;
         int size = 0;
         for (OFMessage ofm :  msglist) {
-                size += ofm.getLengthU();
+        	/* Many OF1.3+ messages are variable in length. So, call 
+        	 * must be made to computeLength() before sizing the buffer.
+        	 */
+            ofm.computeLength(); 
+            size += ofm.getLengthU();
         }
 
-        ChannelBuffer buf = ChannelBuffers.buffer(size);;
+        ChannelBuffer buf = ChannelBuffers.directBuffer(size);
+        ByteBuffer data = buf.toByteBuffer(0, size);
         for (OFMessage ofm :  msglist) {
-            ofm.writeTo(buf);
+            ofm.writeTo(data);
         }
+        //Following call to writerIndex is necessary in case of 
+        // channelBuffer to byteBuffer conversion above
+        buf.writerIndex(data.position());
         return buf;
     }
 

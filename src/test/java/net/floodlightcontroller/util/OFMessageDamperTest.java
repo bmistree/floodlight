@@ -26,7 +26,7 @@ import org.openflow.protocol.OFEchoRequest;
 import org.openflow.protocol.OFHello;
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFType;
-import org.openflow.protocol.factory.BasicFactory;
+import org.openflow.protocol.factory.FloodlightFactory;
 import org.openflow.protocol.factory.OFMessageFactory;
 
 import java.io.IOException;
@@ -50,7 +50,7 @@ public class OFMessageDamperTest {
     
     @Before
     public void setUp() throws IOException {
-        factory = BasicFactory.getInstance();
+        factory = FloodlightFactory.getInstance();
         cntx = new FloodlightContext();
         
         sw1 = new OFMessageDamperMockSwitch();

@@ -17,7 +17,7 @@
 
 package org.openflow.protocol.vendor;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import java.nio.ByteBuffer;
 
 /**
  * The base class for all vendor data.
@@ -31,14 +31,14 @@ public interface OFVendorData {
     public int getLength();
     
     /**
-     * Read the vendor data from the specified ChannelBuffer
+     * Read the vendor data from the specified ByteBuffer
      * @param data
      */
-    public void readFrom(ChannelBuffer data, int length);
+    public void readFrom(ByteBuffer data, int length);
 
     /**
-     * Write the vendor data to the specified ChannelBuffer
+     * Write the vendor data to the specified ByteBuffer
      * @param data
      */
-    public void writeTo(ChannelBuffer data);
+    public void writeTo(ByteBuffer data);
 }

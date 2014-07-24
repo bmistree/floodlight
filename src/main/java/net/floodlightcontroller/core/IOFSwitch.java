@@ -37,6 +37,7 @@ import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFPortStatus;
 import org.openflow.protocol.OFStatisticsReply;
 import org.openflow.protocol.OFStatisticsRequest;
+import org.openflow.protocol.statistics.OFPortDescription;
 import org.openflow.protocol.statistics.OFDescriptionStatistics;
 import org.openflow.protocol.statistics.OFStatistics;
 
@@ -50,7 +51,6 @@ public interface IOFSwitch {
     public static final String SWITCH_DESCRIPTION_FUTURE = "DescriptionFuture";
     public static final String SWITCH_SUPPORTS_NX_ROLE = "supportsNxRole";
     public static final String SWITCH_IS_CORE_SWITCH = "isCoreSwitch";
-    public static final String PROP_FASTWILDCARDS = "FastWildcards";
     public static final String PROP_REQUIRES_L3_MATCH = "requiresL3Match";
     public static final String PROP_SUPPORTS_OFPP_TABLE = "supportsOfppTable";
     public static final String PROP_SUPPORTS_OFPP_FLOOD = "supportsOfppFlood";
@@ -261,8 +261,15 @@ public interface IOFSwitch {
     public void setFeaturesReply(OFFeaturesReply featuresReply);
 
     /**
+     * Set the OFFeaturesReply message returned by the switch during initial
+     * handshake.
+     * @param featuresReply
+     */
+    public void setPortDescriptions(List<OFPortDescription> portDescriptions);
+
+    /**
      * Get list of all enabled ports. This will typically be different from
-     * the list of ports in the OFFeaturesReply, since that one is a static
+     * the list of ports in the OFPortDescription rpely, since that one is a static
      * snapshot of the ports at the time the switch connected to the controller
      * whereas this port list also reflects the port status messages that have
      * been received.
@@ -278,7 +285,7 @@ public interface IOFSwitch {
      * messages that have been received.
      * @return Unmodifiable list of ports not backed by the underlying collection
      */
-    public Collection<Short> getEnabledPortNumbers();
+    public Collection<Integer> getEnabledPortNumbers();
 
     /**
      * Retrieve the port object by the port number. The port object
@@ -287,7 +294,7 @@ public interface IOFSwitch {
      * @param portNumber
      * @return port object
      */
-    public ImmutablePort getPort(short portNumber);
+    public ImmutablePort getPort(int portNumber);
 
     /**
      * Retrieve the port object by the port name. The port object
@@ -336,7 +343,7 @@ public interface IOFSwitch {
      * @return Whether a port is enabled per latest port status message
      * (not configured down nor link down nor in spanning tree blocking state)
      */
-    public boolean portEnabled(short portNumber);
+    public boolean portEnabled(int portNumber);
 
     /**
      * @param portNumber
@@ -545,13 +552,13 @@ public interface IOFSwitch {
      * @return true if there is a cache hit
      *         false if there is no cache hit.
      */
-    public boolean updateBroadcastCache(Long entry, Short port);
+    public boolean updateBroadcastCache(Long entry, Integer port);
 
     /**
      * Get the portBroadcastCacheHits
      * @return
      */
-    public Map<Short, Long> getPortBroadcastHits();
+    public Map<Integer, Long> getPortBroadcastHits();
 
     /**
      * Send a flow statistics request to the switch. This call returns after
@@ -591,14 +598,14 @@ public interface IOFSwitch {
      * @param port_num
      * @return
      */
-    public OFPortType getPortType(short port_num);
+    public OFPortType getPortType(int port_num);
 
     /**
      * Can the port be turned on without forming a new loop?
      * @param port_num
      * @return
      */
-    public boolean isFastPort(short port_num);
+    public boolean isFastPort(int port_num);
 
     /**
      * Return whether write throttling is enabled on the switch

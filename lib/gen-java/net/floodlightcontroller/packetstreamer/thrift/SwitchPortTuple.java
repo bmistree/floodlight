@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
   }
 
   public long dpid; // required
-  public short port; // required
+  public int port; // required
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -129,7 +129,7 @@ import org.slf4j.LoggerFactory;
 
   public SwitchPortTuple(
     long dpid,
-    short port)
+    int port)
   {
     this();
     this.dpid = dpid;
@@ -182,7 +182,7 @@ import org.slf4j.LoggerFactory;
     __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __DPID_ISSET_ID, value);
   }
 
-  public short getPort() {
+  public int getPort() {
     return this.port;
   }
 
@@ -232,7 +232,7 @@ import org.slf4j.LoggerFactory;
       return Long.valueOf(getDpid());
 
     case PORT:
-      return Short.valueOf(getPort());
+      return Integer.valueOf(getPort());
 
     }
     throw new IllegalStateException();
@@ -427,7 +427,7 @@ import org.slf4j.LoggerFactory;
       oprot.writeI64(struct.dpid);
       oprot.writeFieldEnd();
       oprot.writeFieldBegin(PORT_FIELD_DESC);
-      oprot.writeI16(struct.port);
+      oprot.writeI32(struct.port);
       oprot.writeFieldEnd();
       oprot.writeFieldStop();
       oprot.writeStructEnd();
@@ -458,7 +458,7 @@ import org.slf4j.LoggerFactory;
         oprot.writeI64(struct.dpid);
       }
       if (struct.isSetPort()) {
-        oprot.writeI16(struct.port);
+        oprot.writeI32(struct.port);
       }
     }
 

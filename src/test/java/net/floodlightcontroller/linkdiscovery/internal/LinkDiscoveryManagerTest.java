@@ -69,7 +69,7 @@ import org.openflow.protocol.OFPacketIn;
 import org.openflow.protocol.OFPacketIn.OFPacketInReason;
 import org.openflow.protocol.OFPhysicalPort;
 import org.openflow.protocol.OFType;
-import org.openflow.protocol.factory.BasicFactory;
+import org.openflow.protocol.factory.FloodlightFactory;
 import org.openflow.util.HexString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -494,9 +494,9 @@ public class LinkDiscoveryManagerTest extends FloodlightTestCase {
         byte[] testPacketSerialized = testPacket.serialize();
         OFPacketIn pi;
         // build out input packet
-        pi = ((OFPacketIn) BasicFactory.getInstance().getMessage(OFType.PACKET_IN))
+        pi = ((OFPacketIn) FloodlightFactory.getInstance().getMessage(OFType.PACKET_IN))
                 .setBufferId(-1)
-                .setInPort((short) 1)
+                .setMatch(new OFMatch().setInPort(1))
                 .setPacketData(testPacketSerialized)
                 .setReason(OFPacketInReason.NO_MATCH)
                 .setTotalLength((short) testPacketSerialized.length);

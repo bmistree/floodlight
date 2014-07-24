@@ -540,7 +540,7 @@ public class Firewall implements IFirewallService, IOFMessageListener,
         FirewallRule matched_rule = null;
         Ethernet eth = IFloodlightProviderService.bcStore.get(cntx,
                 IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
-        WildcardsPair wildcards = new WildcardsPair();
+        NonWildcardsPair nonWildcards = new NonWildcardsPair();
 
         synchronized (rules) {
             Iterator<FirewallRule> iter = this.rules.iterator();
@@ -551,7 +551,7 @@ public class Firewall implements IFirewallService, IOFMessageListener,
                 rule = iter.next();
 
                 // check if rule matches
-                if (rule.matchesFlow(sw.getId(), pi.getInPort(), eth, wildcards) == true) {
+                if (rule.matchesFlow(sw.getId(), pi.getInPort(), eth, nonWildcards) == true) {
                     matched_rule = rule;
                     break;
                 }
@@ -559,12 +559,14 @@ public class Firewall implements IFirewallService, IOFMessageListener,
         }
 
         // make a pair of rule and wildcards, then return it
+        // TODO: Fix rule such that it only drops this flow,
+        // and not blanket block this switch
         RuleWildcardsPair ret = new RuleWildcardsPair();
         ret.rule = matched_rule;
         if (matched_rule == null || matched_rule.action == FirewallRule.FirewallAction.DENY) {
-            ret.wildcards = wildcards.drop;
+            ret.nonWildcards = nonWildcards.drop;
         } else {
-            ret.wildcards = wildcards.allow;
+            ret.nonWildcards = nonWildcards.allow;
         }
         return ret;
     }
@@ -646,7 +648,7 @@ public class Firewall implements IFirewallService, IOFMessageListener,
                 		, IDeviceService.fcStore.
                         get(cntx, IDeviceService.CONTEXT_SRC_DEVICE),
                         IRoutingDecision.RoutingAction.DROP);
-                decision.setWildcards(match_ret.wildcards);
+                decision.setNonWildcards(match_ret.nonWildcards);
                 decision.addToContext(cntx);
                 if (logger.isTraceEnabled()) {
                     if (rule == null)
@@ -663,7 +665,7 @@ public class Firewall implements IFirewallService, IOFMessageListener,
                 		, IDeviceService.fcStore.
                         get(cntx, IDeviceService.CONTEXT_SRC_DEVICE),
                         IRoutingDecision.RoutingAction.FORWARD_OR_FLOOD);
-                decision.setWildcards(match_ret.wildcards);
+                decision.setNonWildcards(match_ret.nonWildcards);
                 decision.addToContext(cntx);
                 if (logger.isTraceEnabled())
                     logger.trace("Allow rule={} match for PacketIn={}", rule,
