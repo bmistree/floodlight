@@ -296,7 +296,7 @@ public class PronghornModule
             return null;
 
         OFStatisticsRequest ofsr = new OFStatisticsRequest();
-        ofsr.setStatisticType(stats_type);
+        ofsr.setStatisticsType(stats_type);
         return sw.queryStatistics(ofsr);
     }
 
