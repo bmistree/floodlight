@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.openflow.protocol.statistics.OFStatistics;
 import org.openflow.protocol.OFStatisticsRequest;
+import org.openflow.protocol.OFFlowMod;
 
 import net.floodlightcontroller.core.IOFSwitchListener;
 import net.floodlightcontroller.core.module.IFloodlightService;
@@ -18,9 +19,8 @@ public interface IPronghornService extends IFloodlightService {
     /**
        Returns unique id associated with 
      */
-    public int add_entry (PronghornFlowTableEntry entry,String switch_id)
-        throws IOException, IllegalArgumentException;
-    public int remove_entry (PronghornFlowTableEntry entry, String switch_id) 
+
+    public void issue_flow_mod(OFFlowMod flow_mod, String switch_id)
         throws IOException, IllegalArgumentException;
     public void barrier (
         String switch_id,IPronghornBarrierCallback cb) throws IOException;
