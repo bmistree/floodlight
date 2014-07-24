@@ -13,6 +13,8 @@ import org.slf4j.Logger;
 import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.staticflowentry.IStaticFlowEntryPusherService;
 
+import static net.floodlightcontroller.packet.IPv4.toIPv4Address;
+
 public class PronghornFlowTableEntry
 {
     public final static short DEFAULT_PRIORITY = 32767;
@@ -32,17 +34,17 @@ public class PronghornFlowTableEntry
     public Integer ingress_port = null;
     public String src_mac_address = null;
     public String dst_mac_address = null;
-    public Integer vlan_id = null;
-    public Integer vlan_priority = null;
-    public Integer ether_type = null;
-    public Integer tos_bits = null;
-    public Integer protocol = null;
+    public Short vlan_id = null;
+    public Byte vlan_priority_code_point = null;
+    public Short ether_type = null;
+    public Byte tos_bits = null;
+    public Byte network_protocol = null;
 
     public String ip_src = null;
     public String ip_dst = null;
 
-    public Integer src_port = null;
-    public Integer dst_port = null;
+    public Short src_port = null;
+    public Short dst_port = null;
 
     public PronghornFlowTableEntry(Operation op)
     {
@@ -81,7 +83,7 @@ public class PronghornFlowTableEntry
         flow_mod_msg.setMatch(construct_match());
 
         // set output port: applies deletes to all output ports
-        flow_mod_msg.setOutPort(OFPort.OFPP_NONE);
+        //flow_mod_msg.setOutPort(OFPort.OFPP_NONE);
 
         // set priority
         flow_mod_msg.setPriority(priority);
@@ -98,89 +100,48 @@ public class PronghornFlowTableEntry
     {
         // generate a list key-value pairs.  Then, creates a
         // comma-separated list out of these key-value pairs.
+        OFMatch match = new OFMatch();
+        
         List<String> match_string_as_list = new ArrayList<String>();
         if (ingress_port != null)
-        {
-            match_string_as_list.add(
-                OFMatch.STR_IN_PORT + "=" + ingress_port);
-        }
+            match.setInPort(ingress_port);
         
         if (src_mac_address != null)
-        {
-            match_string_as_list.add(
-                OFMatch.STR_DL_SRC + "=" + src_mac_address);
-        }
+            match.setDataLayerSource(src_mac_address);
 
         if (dst_mac_address != null)
-        {
-            match_string_as_list.add(
-                OFMatch.STR_DL_DST + "=" + dst_mac_address);
-        }
+            match.setDataLayerDestination(dst_mac_address);
 
         if (vlan_id != null)
-        {
-            match_string_as_list.add(
-                OFMatch.STR_DL_VLAN + "=" + vlan_id);
-        }
+            match.setDataLayerVirtualLan(vlan_id);
 
-        if (vlan_priority != null)
+        if (vlan_priority_code_point != null)
         {
-            match_string_as_list.add(
-                OFMatch.STR_DL_VLAN_PCP + "=" + vlan_priority);
+            match.setDataLayerVirtualLanPriorityCodePoint(
+                vlan_priority_code_point);
         }
 
         if (ether_type != null)
-        {
-            match_string_as_list.add(
-                OFMatch.STR_DL_TYPE + "=" + ether_type);
-        }
+            match.setDataLayerType(ether_type);
 
         if (tos_bits != null)
-        {
-            match_string_as_list.add(
-                OFMatch.STR_NW_TOS + "=" + tos_bits);
-        }
+            match.setNetworkTypeOfService(tos_bits);
 
-        if (protocol != null)
-        {
-            match_string_as_list.add(
-                OFMatch.STR_NW_PROTO + "=" + protocol);
-        }
+        if (network_protocol != null)
+            match.setNetworkProtocol(network_protocol);
 
         if (ip_src != null)
-        {
-            match_string_as_list.add(
-                OFMatch.STR_NW_SRC + "=" + ip_src);
-        }
+            match.setNetworkSource(toIPv4Address(ip_src));
 
         if (ip_dst != null)
-        {
-            match_string_as_list.add(
-                OFMatch.STR_NW_DST + "=" + ip_dst);
-        }
+            match.setNetworkDestination(toIPv4Address(ip_dst));
         
         if (src_port != null)
-        {
-            match_string_as_list.add(
-                OFMatch.STR_TP_SRC + "=" + src_port);
-        }
+            match.setTransportSource(src_port);
 
         if (dst_port != null)
-        {
-            match_string_as_list.add(
-                OFMatch.STR_TP_DST + "=" + dst_port);
-        }
+            match.setTransportDestination(dst_port);
 
-        StringBuffer match_string = new StringBuffer();
-        for (int i = 0; i < match_string_as_list.size(); ++i)
-        {
-            match_string.append(match_string_as_list.get(i));
-            if (i != (match_string_as_list.size() - 1))
-                match_string.append(",");
-        }
-
-        OFMatch match = new OFMatch();
-        match.fromString(match_string.toString());
         return match;
     }
 }
