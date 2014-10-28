@@ -182,7 +182,8 @@ public class FloodlightModuleLoader implements IModuleService {
                 recommendation=LogMessageDoc.CHECK_CONTROLLER)
     })
     public IFloodlightModuleContext loadModulesFromConfig(String fName) 
-            throws FloodlightModuleException {
+        throws FloodlightModuleException
+    {
         Properties prop = new Properties();
         Collection<String> configMods;
         
@@ -197,6 +198,19 @@ public class FloodlightModuleLoader implements IModuleService {
             configMods = loadProperties(is, null, prop);
         }
 
+        return loadModulesFromList(configMods, prop);
+    }
+
+    public IFloodlightModuleContext load_modules_from_class_loader(
+        String resource_name) throws FloodlightModuleException
+    {
+        Properties prop = new Properties();
+        Collection<String> configMods;
+
+        logger.info("Loading from packaged resource " + resource_name);
+        InputStream is = this.getClass().getClassLoader().
+            getResourceAsStream(resource_name);
+        configMods = loadProperties(is, null, prop);
         return loadModulesFromList(configMods, prop);
     }
 
